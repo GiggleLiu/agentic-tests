@@ -1,0 +1,14 @@
+{
+  "name": "agentic-tests",
+  "owner": {
+    "name": "Jin-Guo Liu"
+  },
+  "plugins": [
+    {
+      "name": "agentic-tests",
+      "description": "Agent-driven testing toolkit: test skills via role-play and test project features via simulated users",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
+}
