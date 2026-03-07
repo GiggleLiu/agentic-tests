@@ -53,4 +53,4 @@ Test reports are saved to `docs/test-reports/` with timestamped filenames.
 
 ## License
 
-MIT
+MIT. Feel free to adapt these skills for your own using, BUT please acknowledge this repo properly, thank you!
