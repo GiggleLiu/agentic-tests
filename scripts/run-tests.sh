@@ -4,7 +4,7 @@ set -euo pipefail
 # run-tests.sh — Run agentic tests for each detected feature or skill.
 #
 # Env vars (from action.yml):
-#   INPUT_RUNNER       — "opencode" or "codex"
+#   INPUT_RUNNER       — "opencode", "codex", or "claude-code"
 #   INPUT_MODE         — "feature", "skill", or "both"
 #   INPUT_PROFILES_DIR — profiles directory (default: docs/agent-profiles)
 #   INPUT_EXTRA_PROMPT — extra instructions appended to each prompt
@@ -27,6 +27,76 @@ REPORTS_DIR="docs/test-reports"
 gh_group()    { echo "::group::$1"; }
 gh_endgroup() { echo "::endgroup::"; }
 gh_warning()  { echo "::warning::$1"; }
+
+expected_target_type() {
+  case "$1" in
+    *test-skill) echo "skill" ;;
+    *)           echo "feature" ;;
+  esac
+}
+
+extract_report_verdict() {
+  local report="$1"
+  sed -n 's/^\*\*Verdict:\*\* //p' "${report}" | head -n 1 | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
+}
+
+extract_critical_issue_count() {
+  local report="$1"
+  local value
+  value=$(sed -n 's/^\*\*Critical Issues:\*\* //p' "${report}" | head -n 1)
+  if [[ "${value}" =~ ^[[:space:]]*([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
+}
+
+report_indicates_failure() {
+  local report="$1"
+  local verdict
+  local critical
+  local fail_count
+  local pass_count
+  local fail_pattern='[Ff][Aa][Ii][Ll]|[Bb][Rr][Oo][Kk][Ee][Nn]|[Cc][Rr][Ii][Tt][Ii][Cc][Aa][Ll]|[Bb][Ll][Oo][Cc][Kk][Ee][Rr]'
+  local pass_pattern='[Pp][Aa][Ss][Ss]|[Ss][Uu][Cc][Cc][Ee][Ss][Ss]|[Ww][Oo][Rr][Kk][Ii][Nn][Gg]|[Cc][Oo][Mm][Pp][Ll][Ee][Tt][Ee]'
+
+  verdict=$(extract_report_verdict "${report}")
+  critical=$(extract_critical_issue_count "${report}")
+
+  if [[ -n "${verdict}" ]]; then
+    [[ "${verdict}" == "fail" ]] && return 0
+    [[ "${verdict}" == "pass" ]] && [[ -z "${critical}" || "${critical}" == "0" ]] && return 1
+  fi
+
+  if [[ -n "${critical}" && "${critical}" != "0" ]]; then
+    return 0
+  fi
+
+  fail_count=$(grep -cE "${fail_pattern}" "${report}" || true)
+  pass_count=$(grep -cE "${pass_pattern}" "${report}" || true)
+  [[ ${fail_count} -gt ${pass_count} ]]
+}
+
+pick_profile_path() {
+  local slug="$1"
+  local expected_type="$2"
+  local candidate
+  local target_type
+  local fallback=""
+
+  [[ -d "${PROFILES_DIR}" ]] || return 0
+
+  while IFS= read -r candidate; do
+    target_type=$(sed -n '/^## Target Type$/ {n; p; q;}' "${candidate}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+    if [[ "${target_type}" == "${expected_type}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+    if [[ -z "${target_type}" && -z "${fallback}" ]]; then
+      fallback="${candidate}"
+    fi
+  done < <(find "${PROFILES_DIR}" -maxdepth 1 -name "${slug}-*.md" -type f | sort)
+
+  [[ -n "${fallback}" ]] && echo "${fallback}"
+}
 
 # ── Ensure reports directory exists ──────────────────────────────────────────
 mkdir -p "${REPORTS_DIR}"
@@ -72,14 +142,12 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
 
   # Normalize target name to slug: lowercase, spaces to hyphens
   slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+  target_type=$(expected_target_type "${TEST_CMD}")
 
   gh_group "Testing: ${TARGET} (${slug})"
 
   # ── Look for a matching agent profile ────────────────────────────────────
-  PROFILE_PATH=""
-  if [[ -d "${PROFILES_DIR}" ]]; then
-    PROFILE_PATH=$(find "${PROFILES_DIR}" -maxdepth 1 -name "${slug}-*.md" -type f | head -1) || true
-  fi
+  PROFILE_PATH="$(pick_profile_path "${slug}" "${target_type}")"
 
   # ── Build the prompt ─────────────────────────────────────────────────────
   if [[ -n "${PROFILE_PATH}" ]]; then
@@ -135,14 +203,9 @@ Additional instructions: ${EXTRA_PROMPT}"
   else
     echo "New report(s):"
     echo "${NEW_REPORTS}"
-    # Check report content for critical failures
-    FAIL_PATTERN='[Ff][Aa][Ii][Ll]|[Bb][Rr][Oo][Kk][Ee][Nn]|[Cc][Rr][Ii][Tt][Ii][Cc][Aa][Ll]|[Bb][Ll][Oo][Cc][Kk][Ee][Rr]'
-    PASS_PATTERN='[Pp][Aa][Ss][Ss]|[Ss][Uu][Cc][Cc][Ee][Ss][Ss]|[Ww][Oo][Rr][Kk][Ii][Nn][Gg]|[Cc][Oo][Mm][Pp][Ll][Ee][Tt][Ee]'
     for rpt in ${NEW_REPORTS}; do
-      FAIL_COUNT=$(grep -cE "${FAIL_PATTERN}" "${rpt}" || true)
-      PASS_COUNT=$(grep -cE "${PASS_PATTERN}" "${rpt}" || true)
-      if [[ ${FAIL_COUNT} -gt ${PASS_COUNT} ]]; then
-        gh_warning "Report ${rpt} indicates failure (fail=${FAIL_COUNT}, pass=${PASS_COUNT})"
+      if report_indicates_failure "${rpt}"; then
+        gh_warning "Report ${rpt} indicates failure"
         ALL_PASS=false
       fi
     done

@@ -11,6 +11,55 @@ gh_endgroup() { echo "::endgroup::"; }
 gh_error()    { echo "::error::$1"; }
 gh_warning()  { echo "::warning::$1"; }
 
+extract_report_verdict() {
+  local report="$1"
+  sed -n 's/^\*\*Verdict:\*\* //p' "${report}" | head -n 1 | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
+}
+
+extract_critical_issue_count() {
+  local report="$1"
+  local value
+  value=$(sed -n 's/^\*\*Critical Issues:\*\* //p' "${report}" | head -n 1)
+  if [[ "${value}" =~ ^[[:space:]]*([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
+}
+
+determine_report_verdict() {
+  local report="$1"
+  local verdict
+  local critical
+  local fail_count
+  local pass_count
+
+  verdict=$(extract_report_verdict "${report}")
+  critical=$(extract_critical_issue_count "${report}")
+
+  if [[ -n "${verdict}" ]]; then
+    if [[ "${verdict}" == "fail" ]]; then
+      echo "Fail"
+      return 0
+    fi
+    if [[ "${verdict}" == "pass" && ( -z "${critical}" || "${critical}" == "0" ) ]]; then
+      echo "Pass"
+      return 0
+    fi
+  fi
+
+  if [[ -n "${critical}" && "${critical}" != "0" ]]; then
+    echo "Fail"
+    return 0
+  fi
+
+  fail_count=$(grep -cE "${FAIL_PATTERN}" "${report}" || true)
+  pass_count=$(grep -cE "${PASS_PATTERN}" "${report}" || true)
+  if [[ ${fail_count} -gt ${pass_count} ]]; then
+    echo "Fail"
+  else
+    echo "Pass"
+  fi
+}
+
 # ── Validate arguments & environment ─────────────────────────────────────────
 ISSUE_NUMBER="${1:-}"
 if [[ -z "${ISSUE_NUMBER}" ]]; then
@@ -30,6 +79,15 @@ fi
 
 REPORT_DIR="docs/test-reports"
 MAX_COMMENT_LENGTH=60000
+RUN_URL=""
+if [[ -n "${GITHUB_SERVER_URL:-}" && -n "${GITHUB_REPOSITORY:-}" && -n "${GITHUB_RUN_ID:-}" ]]; then
+  RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+fi
+if [[ -n "${RUN_URL}" ]]; then
+  REPORTS_LINK="Full reports available in the [workflow run](${RUN_URL})."
+else
+  REPORTS_LINK="Full reports available in the workflow run artifacts."
+fi
 
 # ── Collect report files ─────────────────────────────────────────────────────
 gh_group "Collecting test reports"
@@ -52,7 +110,7 @@ if [[ ${#REPORT_FILES[@]} -eq 0 ]]; then
 No test reports were generated.
 
 ---
-Full reports available as [workflow artifacts](../actions)."
+${REPORTS_LINK}"
 
   gh issue comment "${ISSUE_NUMBER}" --body "${COMMENT}"
   echo "Posted 'no reports' comment on #${ISSUE_NUMBER}"
@@ -99,18 +157,14 @@ for report in "${REPORT_FILES[@]}"; do
   fi
 
   # ── Detect pass/fail ───────────────────────────────────────────────────────
-  FAIL_COUNT=$(echo "${CONTENT}" | grep -cE "${FAIL_PATTERN}" || true)
-  PASS_COUNT=$(echo "${CONTENT}" | grep -cE "${PASS_PATTERN}" || true)
-
-  if [[ ${FAIL_COUNT} -gt ${PASS_COUNT} ]]; then
-    VERDICT="Fail"
+  VERDICT=$(determine_report_verdict "${report}")
+  if [[ "${VERDICT}" == "Fail" ]]; then
     FEATURES_WITH_ISSUES=$((FEATURES_WITH_ISSUES + 1))
   else
-    VERDICT="Pass"
     FEATURES_PASSED=$((FEATURES_PASSED + 1))
   fi
 
-  echo "  Feature: ${FEATURE_NAME} — ${VERDICT} (fail=${FAIL_COUNT}, pass=${PASS_COUNT})"
+  echo "  Feature: ${FEATURE_NAME} — ${VERDICT}"
 
   # ── Build table row ────────────────────────────────────────────────────────
   if [[ "${VERDICT}" == "Pass" ]]; then
@@ -192,8 +246,9 @@ if [[ -n "${ALL_SUGGESTIONS}" ]]; then
 ${ALL_SUGGESTIONS}"
 fi
 
-COMMENT+="---
-Full reports available as [workflow artifacts](../actions)."
+COMMENT+="
+---
+${REPORTS_LINK}"
 
 # ── Truncate if over GitHub's comment size limit ─────────────────────────────
 COMMENT_LENGTH=${#COMMENT}

@@ -35,9 +35,9 @@ Tests any software project's features from a downstream user's perspective. Auto
 
 ```bash
 git clone https://github.com/GiggleLiu/agentic-tests.git ~/.codex/agentic-tests
-mkdir -p .agents/skills
+mkdir -p ~/.agents/skills
 for skill in ~/.codex/agentic-tests/skills/*/; do
-  ln -s "$skill" .agents/skills/"$(basename "$skill")"
+  ln -s "$skill" ~/.agents/skills/"$(basename "$skill")"
 done
 ```
 
@@ -69,7 +69,7 @@ Only repo owners, members, and collaborators can trigger runs.
 ### How It Works
 
 1. **Triggers on comment** — filters for `/agentic-tests` prefix, reacts with eyes emoji
-2. **Checks out the right code** — if commented on a PR, checks out the PR head; otherwise uses the default branch
+2. **Checks out the right code** — if commented on a PR, resolves the PR head repo and SHA before checkout; otherwise uses the default branch
 3. **Installs the agent runner** (OpenCode, Codex, or Claude Code) and registers agentic-tests skills
 4. **Runs tests** — dispatches `/test-feature` or `/test-skill` for each listed feature, with matching agent profiles if available
 5. **Reports results** — posts a summary as a comment on the triggering issue/PR; uploads full reports as workflow artifacts
@@ -92,6 +92,16 @@ Only repo owners, members, and collaborators can trigger runs.
 - **`feature`** — tests project features via `/test-feature`. Simulated users read docs, install, and exercise code. Best for libraries, CLIs, web services.
 - **`skill`** — tests skill flows via `/test-skill`. Role-plays through each SKILL.md with a simulated user persona. Best for skill/plugin repos.
 - **`both`** — runs both. Detection returns items prefixed `feature:name` or `skill:name`.
+
+### Agent Profiles
+
+Saved profiles live in `docs/agent-profiles/`. The current profile schema includes:
+
+- `## Target Type` — `feature` or `skill`
+- `## Target` — the concrete feature or skill name
+- `## Use Case`
+- `## Expected Outcome`
+- `## Agent`
 
 ### Examples
 

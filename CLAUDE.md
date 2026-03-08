@@ -30,9 +30,10 @@ Three skills in `skills/`, each defined by a `SKILL.md` with YAML frontmatter + 
 
 Reusable test configurations stored in `docs/agent-profiles/` as Markdown files.
 
-- **`<feature>-<name>.md`** — saved profiles with feature, use case, expected outcome, and optional agent persona
+- **`<target>-<name>.md`** — saved profiles with `Target Type`, target, use case, expected outcome, and optional agent persona
 - Use `/create-profile` to create profiles interactively; test-skill and test-feature load saved profiles in their Step 0
 - Features and skills are discovered on the fly from project docs (README.md, CLAUDE.md, AGENTS.md) and project structure — no persistent list files needed
+- `test-feature` should only load profiles whose `Target Type` is `feature`; `test-skill` should only load profiles whose `Target Type` is `skill`
 
 ## Report Format
 
@@ -43,8 +44,8 @@ Both skills output reports to `docs/test-reports/`:
 ## Installation
 
 - **Claude Code:** `/plugin marketplace add GiggleLiu/agentic-tests`
-- **Codex:** Clone → symlink to `~/.agents/skills/agentic-tests`
-- **OpenCode:** Clone → symlink to `~/.config/opencode/skills/agentic-tests`
+- **Codex:** Clone → symlink each directory under `skills/*/` into `~/.agents/skills/`
+- **OpenCode:** Clone → symlink each `skills/*/SKILL.md` into `~/.config/opencode/commands/<skill>.md`
 
 ## GitHub Action (CI)
 

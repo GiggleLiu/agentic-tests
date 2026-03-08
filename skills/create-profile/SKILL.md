@@ -18,7 +18,7 @@ Determine whether the user wants to test a project feature or a skill:
 1. Discover features and skills from the project:
    - Read `README.md`, `CLAUDE.md`, `AGENTS.md`, other doc files, and project structure when present. If any expected file is missing, continue with the remaining sources instead of failing.
    - **Features:** Extract user-facing project capabilities such as commands, workflows, APIs, integrations, or configuration systems.
-   - **Skills:** Search for `SKILL.md` files under `skills/` and common locations (`~/.claude/skills/`, plugin directories).
+   - **Skills:** Search for `SKILL.md` files under `skills/`, `.agents/skills/`, and `~/.agents/skills/`. Also check command files under `~/.claude/commands/` and `~/.config/opencode/commands/`.
 
 2. Present the combined list via `AskUserQuestion`, explicitly separating features from skills:
    ```
@@ -81,7 +81,7 @@ Determine whether the user wants to test a project feature or a skill:
 
 ### Step 3 — Choose Agent Persona
 
-1. Scan `docs/agent-profiles/` for files matching `<target-slug>-*.md`.
+1. Scan `docs/agent-profiles/` for files matching `<target-slug>-*.md`. Prefer profiles whose `## Target Type` exactly matches the chosen target type. If the field is missing, treat the file as a legacy profile and only offer it when its `## Target` clearly matches the chosen target.
 2. Generate 3 diverse persona suggestions based on the feature/skill and use case. Vary experience level (beginner, intermediate, expert) and background.
 3. Present via `AskUserQuestion`:
    ```
@@ -113,7 +113,7 @@ Determine whether the user wants to test a project feature or a skill:
 
 ### Step 4 — Save Profile
 
-1. Generate normalized slugs for the target, persona name, and use case. Build these candidate paths:
+1. Generate normalized slugs for the target, persona name, and use case. Slugs must contain only lowercase letters, numbers, and hyphens. Build these candidate paths:
    - Persona-based: `docs/agent-profiles/<target-slug>-<persona-slug>.md`
    - Use-case-based: `docs/agent-profiles/<target-slug>-<use-case-slug>.md`
    If the user already chose a naming preference in Step 2, present that option first as the recommended path.
@@ -121,6 +121,7 @@ Determine whether the user wants to test a project feature or a skill:
 2. Present the complete profile to the user together with the filename options and a short save preview:
    ```
    Profile summary:
+   - Target Type: [feature/skill]
    - Target: [feature/skill name]
    - Use Case: [use case]
    - Expected Outcome: [expected outcome]
@@ -138,6 +139,9 @@ Determine whether the user wants to test a project feature or a skill:
    Saved file preview:
    # [chosen filename stem]
 
+   ## Target Type
+   [feature/skill]
+
    ## Target
    [feature/skill name]
 
@@ -147,7 +151,10 @@ Determine whether the user wants to test a project feature or a skill:
    ## Expected Outcome
    [expected outcome]
    ```
-3. If the user picks **Enter a custom filename**, ask for a path under `docs/agent-profiles/` and normalize it to a `.md` filename.
+3. If the user picks **Enter a custom filename**, ask for a filename relative to `docs/agent-profiles/` and normalize it to a `.md` filename.
+   - Reject absolute paths, `..` segments, `~`, backslashes, and symlink escapes.
+   - Resolve the final path canonically before writing. It must stay within `docs/agent-profiles/` after normalization; otherwise refuse and ask again.
+   - If the user gives only a bare name, save it directly under `docs/agent-profiles/`.
 4. If the user picks **Edit something first**, ask:
    ```
    What do you want to edit?
@@ -167,9 +174,14 @@ Determine whether the user wants to test a project feature or a skill:
    c) Cancel save
    ```
 6. If saving, write the file using this format:
+   - Before writing, verify one more time that the resolved destination is inside `docs/agent-profiles/`.
+   - Never overwrite files outside `docs/agent-profiles/`, even if the normalized filename appears valid.
 
    ```markdown
    # [filename stem]
+
+   ## Target Type
+   [feature|skill]
 
    ## Target
    [Feature or skill name]

@@ -42,18 +42,28 @@ jobs:
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve PR checkout target
+        if: github.event_name == 'issue_comment' && github.event.issue.pull_request
+        id: pr
+        run: |
+          gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }} \
+            --jq '"head_repo="+.head.repo.full_name+"\nhead_sha="+.head.sha' >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Checkout PR head
+        if: steps.pr.outputs.head_sha != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
       - name: Checkout repository
+        if: steps.pr.outputs.head_sha == ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Checkout PR head (if comment is on a PR)
-        if: github.event_name == 'issue_comment' && github.event.issue.pull_request
-        run: |
-          PR_HEAD=$(gh pr view ${{ github.event.issue.number }} --json headRefName -q .headRefName)
-          git checkout "$PR_HEAD"
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: React to comment
         if: github.event_name == 'issue_comment'
