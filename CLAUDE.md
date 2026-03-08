@@ -25,6 +25,15 @@ Two skills in `skills/`, each defined by a `SKILL.md` with YAML frontmatter + in
 - Subagents = independent simulated users, one per feature (can run in parallel)
 - Phases: Discover project & features → Test each feature → Aggregate report
 
+## Agent Profiles
+
+Reusable test configurations stored in `docs/agent-profiles/` as Markdown files.
+
+- **FEATURES.md** — persistent feature list for test-feature, auto-discovered on first run
+- **SKILLS.md** — persistent skill list for test-skill, auto-discovered on first run
+- **`<feature>-<name>.md`** — saved profiles with feature, use case, expected outcome, and optional agent persona
+- Both skills present a Step 0 that lets users select a feature, use case, and agent profile before testing begins
+
 ## Report Format
 
 Both skills output reports to `docs/test-reports/`:
@@ -40,5 +49,6 @@ Both skills output reports to `docs/test-reports/`:
 ## Key Files
 
 - `.claude-plugin/plugin.json` / `marketplace.json` — Plugin metadata for Claude Code marketplace
+- `docs/agent-profiles/` — Reusable agent profiles and feature list
 - `docs/plans/` — Design documents
 - `docs/test-reports/` — Test report output directory

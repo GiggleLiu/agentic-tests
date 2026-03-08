@@ -11,13 +11,119 @@ A general-purpose skill testing framework. It executes any skill's SKILL.md by r
 
 ---
 
-### Step 0 — Choose Target & Analyze
+### Step 0 — Select Agent Profile
 
-Accept a skill path from the user, or list available skills and let the user pick via `AskUserQuestion`.
+#### 0a. Select Skill
+
+1. Check whether `docs/agent-profiles/SKILLS.md` exists in the project.
+   - **If it exists:** Load the skill list from it.
+   - **If it does not exist:** Discover available skills by searching for `SKILL.md` files under `skills/` in the current project and common skill locations (`~/.claude/skills/`, plugin directories). Create `docs/agent-profiles/SKILLS.md` with the discovered skills using this format:
+     ```markdown
+     # Skills
+
+     - [Skill Name] — [one-line description from SKILL.md frontmatter]
+     ```
+   - **Note:** This file is separate from `FEATURES.md` used by test-feature. Both can coexist in the same directory.
+2. Present the skill list to the user via `AskUserQuestion`:
+   ```
+   I found these skills:
+   a) [Skill 1] — [description]
+   b) [Skill 2] — [description]
+   ...
+   u) Update the skill list
+
+   Which skill would you like to test?
+   ```
+3. If the user picks "Update the skill list", let them add/remove/edit skills, save the updated `docs/agent-profiles/SKILLS.md`, and re-present the list.
+4. Record the chosen skill name and path for the following sub-steps.
+
+#### 0b. Select Use Case
+
+1. Read the chosen skill's `SKILL.md` and analyze its phases, decision points, and flow to understand what interaction scenarios are possible.
+2. Propose 2–4 realistic usage scenarios, each with a suggested expected outcome. Infer scenarios from the skill's decision points and phases. Present via `AskUserQuestion`:
+   ```
+   Here are some use cases for "[skill name]":
+   a) [Scenario 1 — e.g., "Happy path — user accepts all suggestions"] — Expected: [what success looks like]
+   b) [Scenario 2 — e.g., "Challenging — user pushes back at first decision point"] — Expected: [what success looks like]
+   c) [Scenario 3 — e.g., "Off-topic — user asks about unrelated topic mid-flow"] — Expected: [what success looks like]
+   d) Describe your own use case
+
+   Which use case would you like to test?
+   ```
+3. If the user picks "Describe your own use case", ask them to describe the scenario and expected outcome.
+4. Confirm the expected outcome with the user:
+   ```
+   Use case: [selected use case]
+   Expected outcome: [expected outcome]
+
+   Does this look right? (yes / edit)
+   ```
+5. Record the chosen use case and expected outcome.
+
+#### 0c. Select Agent Profile
+
+1. Scan `docs/agent-profiles/` for files matching `<skill>-*.md` (where `<skill>` is the chosen skill name, lowercased, with spaces replaced by hyphens).
+2. Generate 3 diverse persona suggestions based on the skill and use case. Vary experience level (beginner, intermediate, expert) and background.
+3. Present via `AskUserQuestion`:
+   ```
+   Agent profile options:
+   [If saved profiles exist:]
+   a) Load saved: [profile-name-1]
+   [... additional saved profiles ...]
+
+   Generated personas:
+   b) [Name] — [Experience level], [one-line background summary]
+   c) [Name] — [Experience level], [one-line background summary]
+   d) [Name] — [Experience level], [one-line background summary]
+   e) Create a custom profile (I'll describe the persona)
+   f) Random (generate a surprising persona)
+
+   Which agent profile?
+   ```
+   If no saved profiles exist, omit the "Load saved" section and start generated personas at (a).
+4. If the user picks a saved profile, load it from the file.
+5. If the user picks a generated persona, populate the full profile fields and ask whether to save it:
+   ```
+   Save this profile to docs/agent-profiles/[skill]-[name].md? (yes / no)
+   ```
+   If yes, write the file using this format:
+   ```markdown
+   # [skill]-[name]
+
+   ## Feature
+   [Skill name]
+
+   ## Use Case
+   [What the user scenario is]
+
+   ## Expected Outcome
+   [What success looks like]
+
+   ## Agent
+
+   ### Background
+   [Who this person is]
+
+   ### Experience Level
+   [Beginner/Intermediate/Expert]
+
+   ### Decision Tendencies
+   [How they behave]
+
+   ### Quirks
+   [Realistic traits]
+   ```
+6. If the user picks "Create a custom profile", ask them to describe the persona, then populate the profile fields and offer to save.
+7. If the user picks "Random", generate a surprising but plausible persona, populate the profile fields, and offer to save.
+8. Record the full profile (name, background, experience level, decision tendencies, quirks) for use in subsequent steps.
+
+### Step 1 — Choose Target & Analyze
+
+Accept a skill path from the user, or — if a skill was already selected in Step 0 — use that selection. If neither, list available skills and let the user pick via `AskUserQuestion`.
 
 **Find available skills:** Search for `SKILL.md` files under `skills/` in the current project. Also check common skill locations (`~/.claude/skills/`, plugin directories). Present each skill with its `name` and `description` from frontmatter.
 
-Once the user selects a skill, read its full `SKILL.md` and extract:
+Once the user selects a skill (or the Step 0 selection is confirmed), read its full `SKILL.md` and extract:
 
 - **Phases/steps** and their entry conditions (e.g., "skip if chaining from survey")
 - **Decision points** — every place the skill calls `AskUserQuestion`, with the options it presents
@@ -55,9 +161,15 @@ Ask the user via `AskUserQuestion`:
 > - **(b)** Focus on specific phases — choose which phases to test
 > - **(c)** Adjust preconditions — set up specific mock context before testing
 
-### Step 1 — Generate Persona
+### Step 2 — Generate Persona
 
-Analyze the skill to infer what kind of user it serves. Consider:
+**If a profile was loaded in Step 0 with Agent details:** Pre-populate the persona from the profile fields (Background, Experience Level, Decision Tendencies, Quirks). Infer Motivation from the profile's Use Case. Present the pre-populated persona to the user for adjustment (see below).
+
+**If "Random" was selected in Step 0:** Run the full persona generation below as if no profile exists.
+
+**If a profile was loaded but has no Agent details:** Auto-generate a persona based on the use case and skill analysis, then present for adjustment.
+
+**If Step 0 was skipped (no profile):** Analyze the skill to infer what kind of user it serves. Consider:
 
 - What domain knowledge does the skill assume?
 - What motivations would bring someone to this skill?
@@ -80,9 +192,9 @@ Present the persona to the user via `AskUserQuestion`:
 > - **(d)** Adversarial — generate a persona designed to break assumptions (one-word answers, misunderstandings, off-topic tangents, ignores instructions)
 > - **(e)** Let me describe a custom persona
 
-### Step 2 — Execute the Skill with Role Play
+### Step 3 — Execute the Skill with Role Play
 
-**Set up preconditions.** Based on Step 0 analysis, create any mock files or context the skill expects. For example:
+**Set up preconditions.** Based on Step 1 analysis, create any mock files or context the skill expects. For example:
 - If the skill checks for a user profile, create a mock `docs/discussion/user-profile.md` matching the persona
 - If the skill expects survey registries, create minimal mock registries
 - If the skill needs MCP servers, note which are available and which will be absent
@@ -102,6 +214,11 @@ Decision tendencies: [tendencies]
 Quirks: [quirks]
 
 You are testing a tool that [one-line skill description].
+
+Use case: [use case from profile, or "general exploration" if none]
+Expected outcome: [expected outcome from profile, or "discover what happens" if none]
+
+Your goal is to interact with this skill as a real user pursuing the above use case. Your interactions should naturally drive toward (or away from, if your persona would) the expected outcome.
 
 When I present you with questions or options, respond in character:
 - Be realistic — sometimes enthusiastic, sometimes uncertain, sometimes push back or ask for clarification
@@ -133,7 +250,7 @@ The first question is: [first decision point from the skill]
 - Maximum **10 subagent resumes** per phase — if a phase loops, note it and move on
 - If the skill attempts to launch its own subagents (e.g., survey's parallel strategies), execute them normally — only the user-facing `AskUserQuestion` calls go to the simulated user
 
-### Step 3 — Collect Feedback & Report
+### Step 4 — Collect Feedback & Report
 
 **Resume the subagent one final time** — stay in character. Interview the persona as the skill's agent would naturally wrap up:
 
@@ -157,6 +274,9 @@ The persona answers as themselves — no stepping out of character, no meta-anal
 
 **Date:** [timestamp]
 **Persona:** [name] — [one-line description]
+**Profile:** [profile name or "ephemeral"]
+**Use Case:** [use case description or "none specified"]
+**Expected Outcome:** [expected outcome or "none specified"]
 **Phases tested:** [list]
 **Decision points exercised:** [N of M total]
 
@@ -173,7 +293,7 @@ The persona answers as themselves — no stepping out of character, no meta-anal
 
 ## Output Validation
 
-- **Expected files:** [list from Step 0 analysis]
+- **Expected files:** [list from Step 1 analysis]
 - **Actually created:** [list with status — created/missing/wrong format]
 - **Format check:** [any format issues in created files]
 
@@ -184,6 +304,10 @@ The persona answers as themselves — no stepping out of character, no meta-anal
 ## Persona Interview
 
 [In-character responses from the simulated user to the wrap-up questions. These reflect what happened during the interaction, not meta-analysis.]
+
+## Expected vs Actual Outcome
+
+[Compare the expected outcome (from the profile or Step 0) against what actually happened during the test. Was the expected outcome achieved, partially achieved, or not achieved? Describe any surprising differences. If no expected outcome was specified, note "No expected outcome was specified" and summarize what the interaction produced.]
 
 ## Structural Observations (from test executor)
 
@@ -209,8 +333,8 @@ Present the report path to the user and offer:
 
 > "Test complete. Report saved to `docs/test-reports/[file]`. What next?"
 > - **(a)** Review the report together — walk through findings
-> - **(b)** Run another test — same skill, different persona (skips Step 0 analysis — reuses the existing analysis)
+> - **(b)** Run another test — same skill, different persona (skips Step 1 analysis — reuses the existing analysis)
 > - **(c)** Test a different skill
 > - **(d)** Done
 
-**Re-run shortcut:** When the user selects **(b)**, skip Step 0 entirely — the skill analysis doesn't change. Go straight to Step 1 (persona generation) with the same target skill.
+**Re-run shortcut:** When the user selects **(b)**, skip Step 1 entirely — the skill analysis doesn't change. Go straight to Step 2 (persona generation) with the same target skill. If a profile was used, return to Step 0c to select a new profile; otherwise go to Step 2.
