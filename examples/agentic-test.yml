@@ -2,33 +2,43 @@
 #
 # This workflow uses GiggleLiu/agentic-tests to spin up AI agents that
 # simulate real users: they read your docs, set up the project, and
-# exercise features end-to-end on every pull request.
+# exercise features end-to-end.
+#
+# Trigger by commenting "/agentic-tests" on any issue or PR.
+# Override features: "/agentic-tests auth,api"
 #
 # Setup steps:
 #   1. Copy this file into your repo at .github/workflows/agentic-test.yml
 #   2. Add your LLM provider API key as a repository secret:
 #        Settings > Secrets and variables > Actions > New repository secret
 #        Name: ANTHROPIC_API_KEY   Value: sk-ant-...
-#   3. (Optional) Customize the triggers below to match your workflow.
+#   3. Customize the DEFAULT_FEATURES list below to match your project.
 #   4. (Optional) Add agent profiles in docs/agent-profiles/ to define
-#      reusable test personas and feature lists. See:
+#      reusable test personas. See:
 #      https://github.com/GiggleLiu/agentic-tests#agent-profiles
 
 name: Agentic Tests
 
 on:
-  schedule:
-    - cron: '0 8 * * 1'   # Every Monday at 08:00 UTC (customize as needed)
-  pull_request:
-    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
 
 permissions:
+  issues: write
   pull-requests: write
   contents: read
 
+env:
+  # ── Customize these ──────────────────────────────────────────────────────────
+  DEFAULT_FEATURES: 'auth,api,cli'     # comma-separated features to test
+
 jobs:
   agentic-test:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       startsWith(github.event.comment.body, '/agentic-tests'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -36,17 +46,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: React to comment
+        if: github.event_name == 'issue_comment'
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -f content=eyes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Parse features from comment
+        if: github.event_name == 'issue_comment'
+        id: parse
+        run: |
+          BODY="${{ github.event.comment.body }}"
+          ARGS=$(echo "$BODY" | sed -n 's|^/agentic-tests[[:space:]]*||p')
+          if [ -n "$ARGS" ]; then
+            echo "features=$ARGS" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
       - name: Run agentic tests
         uses: GiggleLiu/agentic-tests@v1
         with:
           provider: anthropic
-          # mode: feature               # "feature", "skill", or "both"
+          features: ${{ steps.parse.outputs.features || env.DEFAULT_FEATURES }}
+          issue-number: ${{ github.event.issue.number }}
+          # runner: codex             # "opencode" (default), "codex", or "claude-code"
+          # mode: feature             # "feature", "skill", or "both"
           # model: claude-sonnet-4-20250514
-          # features: auto              # "auto" for PRs; list all features for scheduled runs
           # extra-prompt: 'focus on error handling and edge cases'
-          # Schedule tip: for scheduled/manual runs, set features explicitly
-          # since there's no PR diff to auto-detect from:
-          #   features: ${{ github.event_name == 'pull_request' && 'auto' || 'feat1,feat2' }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
