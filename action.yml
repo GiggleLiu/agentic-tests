@@ -68,6 +68,10 @@ runs:
               echo "[features]"
               echo "multi_agent = true"
             } > ~/.codex/config.toml
+            # Authenticate codex with API key
+            if [ -n "${OPENAI_API_KEY:-}" ]; then
+              printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+            fi
             ;;
           claude-code)
             MODEL="${{ inputs.model }}"
