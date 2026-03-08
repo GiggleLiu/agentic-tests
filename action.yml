@@ -18,19 +18,18 @@ inputs:
     required: false
     default: 'feature'
   features:
-    description: '"auto" to AI-detect from diff, or comma-separated feature/skill list'
-    required: false
-    default: 'auto'
+    description: 'Comma-separated list of features/skills to test'
+    required: true
   profiles-dir:
     description: 'Directory containing saved agent profiles'
     required: false
     default: 'docs/agent-profiles'
-  base-branch:
-    description: 'Base branch for diff comparison'
-    required: false
-    default: 'origin/main'
   extra-prompt:
     description: 'Extra instructions appended to each test prompt (e.g., "focus on error handling", "test as a beginner")'
+    required: false
+    default: ''
+  issue-number:
+    description: 'Issue or PR number to post results to (optional)'
     required: false
     default: ''
 
@@ -126,14 +125,12 @@ runs:
         esac
       shell: bash
 
-    - name: Detect affected features
-      run: ${{ github.action_path }}/scripts/detect-features.sh
+    - name: Write feature list
+      run: |
+        echo "${{ inputs.features }}" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' > /tmp/affected-features.txt
+        echo "Features to test:"
+        cat /tmp/affected-features.txt
       shell: bash
-      env:
-        INPUT_RUNNER: ${{ inputs.runner }}
-        INPUT_MODE: ${{ inputs.mode }}
-        INPUT_FEATURES: ${{ inputs.features }}
-        INPUT_BASE_BRANCH: ${{ inputs.base-branch }}
 
     - name: Run agentic tests
       id: test
@@ -153,9 +150,9 @@ runs:
         path: docs/test-reports/*.md
         if-no-files-found: ignore
 
-    - name: Post PR comment
-      if: always() && github.event_name == 'pull_request'
-      run: ${{ github.action_path }}/scripts/post-comment.sh ${{ github.event.pull_request.number }}
+    - name: Post results
+      if: always() && inputs.issue-number != ''
+      run: ${{ github.action_path }}/scripts/post-result.sh ${{ inputs.issue-number }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
