@@ -9,115 +9,33 @@ Simulates downstream users who want to use a software project's features. Each s
 
 Works with any software project type: libraries, CLI tools, web services, plugins, frameworks, etc.
 
-**Input:** User specifies feature name(s) (e.g., `/test-feature authentication`). If none specified, discover features from project docs and test all.
+**Input:** `/test-feature` starts the interactive profile selection. `/test-feature <profile-path>` loads a saved profile directly and skips Step 0 (e.g., `/test-feature docs/agent-profiles/auth-alex.md`). `/test-feature <feature-name>` (non-path argument) tests the named feature with auto-generated persona. If none specified, discover features from project docs and test all.
 
 ---
 
-### Step 0 — Select Agent Profile
+### Step 0 — Load Agent Profile
 
-#### 0a. Select Feature
+**If the argument is a file path (contains `/` or ends in `.md`):** Read the profile file directly. Extract Target (feature name), Use Case, Expected Outcome, and Agent fields. Skip the selection UI below and proceed to Step 1.
 
-1. Check whether `docs/agent-profiles/FEATURES.md` exists in the project.
-   - **If it exists:** Load the feature list from it.
-   - **If it does not exist:** Discover features from the project's README, doc files, and project structure. Create `docs/agent-profiles/FEATURES.md` with the discovered features using this format:
-     ```markdown
-     # Features
+**If the argument is a feature name (not a path):** Use it as the feature to test, skip Step 0, and proceed to Step 1 with auto-generated persona.
 
-     - [Feature Name] — [one-line description]
-     ```
-   - **Note:** This file is separate from `SKILLS.md` used by test-skill. Both can coexist in the same directory.
-2. Present the feature list to the user via `AskUserQuestion`:
-   ```
-   I found these features:
-   a) [Feature 1] — [description]
-   b) [Feature 2] — [description]
-   ...
-   u) Update the feature list
+**Otherwise:** Scan `docs/agent-profiles/` for saved profile files (`*.md`). Present via `AskUserQuestion`:
 
-   Which feature would you like to test?
-   ```
-3. If the user picks "Update the feature list", let them add/remove/edit features, save the updated `docs/agent-profiles/FEATURES.md`, and re-present the list.
-4. Record the chosen feature name for the following sub-steps.
+```
+Choose a test profile:
+[If saved profiles exist:]
+a) [profile-name] — [feature]: [use case summary]
+[... additional profiles ...]
 
-#### 0b. Select Use Case
+b) Create a new profile (runs /create-profile)
+c) Random — auto-generate a persona and start immediately
+```
 
-1. Analyze the chosen feature's documentation (README sections, doc files, examples, API references) to understand what a user can do with this feature.
-2. Propose 2–4 realistic usage scenarios, each with a suggested expected outcome. Present via `AskUserQuestion`:
-   ```
-   Here are some use cases for "[feature]":
-   a) [Scenario 1] — Expected: [what success looks like]
-   b) [Scenario 2] — Expected: [what success looks like]
-   c) [Scenario 3] — Expected: [what success looks like]
-   d) Describe your own use case
+If no saved profiles exist, omit option (a) and show only "Create new" and "Random."
 
-   Which use case would you like to test?
-   ```
-3. If the user picks "Describe your own use case", ask them to describe the scenario and expected outcome.
-4. Confirm the expected outcome with the user:
-   ```
-   Use case: [selected use case]
-   Expected outcome: [expected outcome]
-
-   Does this look right? (yes / edit)
-   ```
-5. Record the chosen use case and expected outcome.
-
-#### 0c. Select Agent Profile
-
-1. Scan `docs/agent-profiles/` for files matching `<feature>-*.md` (where `<feature>` is the chosen feature name, lowercased, with spaces replaced by hyphens).
-2. Generate 3 diverse persona suggestions based on the feature and use case. Vary experience level (beginner, intermediate, expert) and background.
-3. Present via `AskUserQuestion`:
-   ```
-   Agent profile options:
-   [If saved profiles exist:]
-   a) Load saved: [profile-name-1]
-   [... additional saved profiles ...]
-
-   Generated personas:
-   b) [Name] — [Experience level], [one-line background summary]
-   c) [Name] — [Experience level], [one-line background summary]
-   d) [Name] — [Experience level], [one-line background summary]
-   e) Create a custom profile (I'll describe the persona)
-   f) Random (generate a surprising persona)
-
-   Which agent profile?
-   ```
-   If no saved profiles exist, omit the "Load saved" section and start generated personas at (a).
-4. If the user picks a saved profile, load it from the file.
-5. If the user picks a generated persona, populate the full profile fields and ask whether to save it:
-   ```
-   Save this profile to docs/agent-profiles/[feature]-[name].md? (yes / no)
-   ```
-   If yes, write the file using this format:
-   ```markdown
-   # [feature]-[name]
-
-   ## Feature
-   [Feature name]
-
-   ## Use Case
-   [What the user is trying to do]
-
-   ## Expected Outcome
-   [What success looks like]
-
-   ## Agent
-
-   ### Background
-   [Who this person is]
-
-   ### Experience Level
-   [Beginner/Intermediate/Expert]
-
-   ### Decision Tendencies
-   [How they behave]
-
-   ### Quirks
-   [Realistic traits]
-   ```
-6. If the user picks "Create a custom profile", ask them to describe the persona, then populate the profile fields and offer to save.
-7. If the user picks "Random", generate a surprising but plausible persona, populate the profile fields, and offer to save.
-8. Record the full profile (name, background, experience level, decision tendencies, quirks) for use in subsequent steps.
+- **Load saved:** Read the profile file. Extract Target (feature name), Use Case, Expected Outcome, and Agent fields. These carry forward into subsequent steps.
+- **Create new:** Suggest the user run `/create-profile` first, then return to `/test-feature` with the saved profile.
+- **Random:** Auto-generate a feature selection (from project docs), use case, expected outcome, and persona. Proceed immediately without saving.
 
 ### Step 1 — Discover Project & Features
 

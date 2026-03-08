@@ -1,0 +1,96 @@
+name: 'Agentic Tests'
+description: 'Run AI-driven agentic tests on your project using OpenCode and saved agent profiles'
+
+inputs:
+  provider:
+    description: 'LLM provider — anthropic, openai, moonshot, etc.'
+    required: true
+  model:
+    description: 'Model to use'
+    required: false
+    default: ''
+  features:
+    description: '"auto" to AI-detect from diff, or comma-separated feature list'
+    required: false
+    default: 'auto'
+  profiles-dir:
+    description: 'Directory containing saved agent profiles'
+    required: false
+    default: 'docs/agent-profiles'
+  base-branch:
+    description: 'Base branch for diff comparison'
+    required: false
+    default: 'origin/main'
+  extra-prompt:
+    description: 'Extra instructions appended to each test prompt (e.g., "focus on error handling", "test as a beginner")'
+    required: false
+    default: ''
+
+outputs:
+  features-tested:
+    description: 'Comma-separated feature names tested'
+    value: ${{ steps.test.outputs.features-tested }}
+  pass:
+    description: '"true" if no critical issues found'
+    value: ${{ steps.test.outputs.pass }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install OpenCode
+      run: ${{ github.action_path }}/scripts/install-opencode.sh
+      shell: bash
+
+    - name: Configure OpenCode
+      run: |
+        python3 -c "
+        import json
+        config = {'provider': '${{ inputs.provider }}'}
+        model = '${{ inputs.model }}'
+        if model:
+            config['agents'] = {'coder': {'model': model}}
+        with open('.opencode.json', 'w') as f:
+            json.dump(config, f, indent=2)
+        "
+      shell: bash
+
+    - name: Install agentic-tests commands
+      run: |
+        mkdir -p ~/.config/opencode/commands
+        for skill_dir in ${{ github.action_path }}/skills/*/; do
+          skill_name="$(basename "$skill_dir")"
+          if [ -f "$skill_dir/SKILL.md" ]; then
+            cp "$skill_dir/SKILL.md" ~/.config/opencode/commands/"$skill_name".md
+          fi
+        done
+      shell: bash
+
+    - name: Detect affected features
+      run: ${{ github.action_path }}/scripts/detect-features.sh
+      shell: bash
+      env:
+        INPUT_FEATURES: ${{ inputs.features }}
+        INPUT_BASE_BRANCH: ${{ inputs.base-branch }}
+
+    - name: Run agentic tests
+      id: test
+      run: ${{ github.action_path }}/scripts/run-tests.sh
+      shell: bash
+      env:
+        INPUT_PROFILES_DIR: ${{ inputs.profiles-dir }}
+        INPUT_EXTRA_PROMPT: ${{ inputs.extra-prompt }}
+
+    - name: Upload test reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agentic-test-reports
+        path: docs/test-reports/*.md
+        if-no-files-found: ignore
+
+    - name: Post PR comment
+      if: always() && github.event_name == 'pull_request'
+      run: ${{ github.action_path }}/scripts/post-comment.sh ${{ github.event.pull_request.number }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}

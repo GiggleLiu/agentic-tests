@@ -1,0 +1,46 @@
+# Agentic Tests — AI-driven end-to-end testing for your project
+#
+# This workflow uses GiggleLiu/agentic-tests to spin up AI agents that
+# simulate real users: they read your docs, set up the project, and
+# exercise features end-to-end on every pull request.
+#
+# Setup steps:
+#   1. Copy this file into your repo at .github/workflows/agentic-test.yml
+#   2. Add your LLM provider API key as a repository secret:
+#        Settings > Secrets and variables > Actions > New repository secret
+#        Name: ANTHROPIC_API_KEY   Value: sk-ant-...
+#   3. (Optional) Customize the triggers below to match your workflow.
+#   4. (Optional) Add agent profiles in docs/agent-profiles/ to define
+#      reusable test personas and feature lists. See:
+#      https://github.com/GiggleLiu/agentic-tests#agent-profiles
+
+name: Agentic Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  agentic-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run agentic tests
+        uses: GiggleLiu/agentic-tests@v1
+        with:
+          provider: anthropic
+          # model: claude-sonnet-4-20250514
+          # features: auto
+          # extra-prompt: 'focus on error handling and edge cases'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

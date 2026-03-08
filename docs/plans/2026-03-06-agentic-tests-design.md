@@ -5,10 +5,11 @@
 
 ## Overview
 
-A skill-based plugin for AI coding assistants that provides agent-driven testing capabilities. Two skills:
+A skill-based plugin for AI coding assistants that provides agent-driven testing capabilities. Three skills:
 
-1. **test-skill** — Tests any skill's conversational flow via role-play (main agent + simulated user subagent)
-2. **test-feature** — Tests any software project's features from a downstream user's perspective (auto-detects project type, dispatches parallel subagents)
+1. **create-profile** — Creates and manages reusable agent profiles (feature/skill selection, use case, persona)
+2. **test-skill** — Tests any skill's conversational flow via role-play (main agent + simulated user subagent)
+3. **test-feature** — Tests any software project's features from a downstream user's perspective (auto-detects project type, dispatches parallel subagents)
 
 ## Decisions
 
@@ -25,9 +26,14 @@ agentic-tests/
 │   ├── plugin.json
 │   └── marketplace.json
 ├── skills/
+│   ├── create-profile/SKILL.md
 │   ├── test-skill/SKILL.md
 │   └── test-feature/SKILL.md
 ├── docs/
+│   ├── agent-profiles/
+│   │   ├── FEATURES.md (test-feature)
+│   │   ├── SKILLS.md (test-skill)
+│   │   └── *.md (saved profiles)
 │   ├── plans/
 │   └── test-reports/
 ├── CLAUDE.md

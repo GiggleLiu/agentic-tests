@@ -47,6 +47,39 @@ mkdir -p ~/.config/opencode/skills
 ln -s ~/.config/opencode/agentic-tests/skills/agentic-tests ~/.config/opencode/skills/agentic-tests
 ```
 
+## CI Integration
+
+Run agentic tests automatically on pull requests via the GitHub Action:
+
+```yaml
+# .github/workflows/agentic-test.yml
+name: Agentic Tests
+on:
+  pull_request:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  agentic-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: GiggleLiu/agentic-tests@v1
+        with:
+          provider: anthropic
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+The action detects which features are affected by the PR diff, tests each with a simulated user, and posts results as a PR comment. Full reports are uploaded as workflow artifacts.
+
+See `examples/agentic-test.yml` for more options (model selection, explicit feature lists, custom profile directories).
+
 ## Reports
 
 Test reports are saved to `docs/test-reports/` with timestamped filenames.
