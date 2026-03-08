@@ -1,13 +1,12 @@
 # Agentic Tests — dogfood: test this plugin's own skills with simulated users
 #
-# Requires: MOONSHOT_API_KEY secret (Settings > Secrets > Actions)
+# Requires: OPENAI_API_KEY secret (Settings > Secrets > Actions)
 
 name: Agentic Tests
 
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 8 * * 1'   # Every Monday at 08:00 UTC
   pull_request:
     types: [opened, synchronize]
   workflow_dispatch:
@@ -31,6 +30,7 @@ jobs:
           runner: codex
           provider: openai
           mode: skill
+          features: ${{ github.event_name == 'pull_request' && 'auto' || 'test-skill,test-feature,create-profile' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -17,6 +17,8 @@
 name: Agentic Tests
 
 on:
+  schedule:
+    - cron: '0 8 * * 1'   # Every Monday at 08:00 UTC (customize as needed)
   pull_request:
     types: [opened, synchronize]
   workflow_dispatch:
@@ -40,8 +42,11 @@ jobs:
           provider: anthropic
           # mode: feature               # "feature", "skill", or "both"
           # model: claude-sonnet-4-20250514
-          # features: auto
+          # features: auto              # "auto" for PRs; list all features for scheduled runs
           # extra-prompt: 'focus on error handling and edge cases'
+          # Schedule tip: for scheduled/manual runs, set features explicitly
+          # since there's no PR diff to auto-detect from:
+          #   features: ${{ github.event_name == 'pull_request' && 'auto' || 'feat1,feat2' }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
