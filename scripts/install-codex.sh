@@ -55,7 +55,7 @@ data = json.load(sys.stdin)
 # Match 'codex-<arch>-...-linux-...' but exclude proxy/runner/sandbox variants
 for asset in data.get('assets', []):
     name = asset['name']
-    if re.match(r'^codex-(x86_64|aarch64).*linux.*\.tar\.gz$', name) \
+    if re.match(r'^codex-x86_64.*linux.*\.tar\.gz$', name) \
        and 'responses-api-proxy' not in name \
        and 'command-runner' not in name \
        and 'sandbox' not in name \
