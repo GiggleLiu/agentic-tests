@@ -77,17 +77,24 @@ Example: [\"authentication\", \"REST API\"]
 If nothing is affected, return: []"
 
 # Call the agent runner
+RUNNER_FAILED=false
 case "$RUNNER" in
   codex)
-    RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>/dev/null || echo "[]")
+    RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>&1) || RUNNER_FAILED=true
     ;;
   claude-code)
-    RESPONSE=$(claude -p "$PROMPT" --allowedTools "Bash,Read,Glob,Grep" --no-session-persistence 2>/dev/null || echo "[]")
+    RESPONSE=$(claude -p "$PROMPT" --allowedTools "Bash,Read,Glob,Grep" --no-session-persistence 2>&1) || RUNNER_FAILED=true
     ;;
   *)
-    RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
+    RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>&1) || RUNNER_FAILED=true
     ;;
 esac
+
+if [ "$RUNNER_FAILED" = true ]; then
+  echo "::warning::${RUNNER} failed to detect features. Check API key and runner configuration."
+  echo "::warning::Runner output: ${RESPONSE}"
+  RESPONSE="[]"
+fi
 
 # Extract JSON array from response (runner may add extra text)
 JSON=$(echo "$RESPONSE" | grep -o '\[.*\]' | head -1)

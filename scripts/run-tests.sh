@@ -125,7 +125,7 @@ Additional instructions: ${EXTRA_PROMPT}"
   set -e
 
   if [[ ${EXIT_CODE} -ne 0 ]]; then
-    gh_warning "opencode exited with code ${EXIT_CODE} for feature '${feature}'"
+    gh_warning "${RUNNER} exited with code ${EXIT_CODE} for feature '${feature}'"
     ALL_PASS=false
   fi
 
