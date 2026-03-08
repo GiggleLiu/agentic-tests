@@ -78,20 +78,22 @@ If nothing is affected, return: []"
 
 # Call the agent runner
 RUNNER_FAILED=false
+EXIT_CODE=0
 case "$RUNNER" in
   codex)
-    RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>&1) || RUNNER_FAILED=true
+    RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>&1) || EXIT_CODE=$?
     ;;
   claude-code)
-    RESPONSE=$(claude -p "$PROMPT" --allowedTools "Bash,Read,Glob,Grep" --no-session-persistence 2>&1) || RUNNER_FAILED=true
+    RESPONSE=$(claude -p "$PROMPT" --allowedTools "Bash,Read,Glob,Grep" --no-session-persistence 2>&1) || EXIT_CODE=$?
     ;;
   *)
-    RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>&1) || RUNNER_FAILED=true
+    RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>&1) || EXIT_CODE=$?
     ;;
 esac
 
-if [ "$RUNNER_FAILED" = true ]; then
-  echo "::warning::${RUNNER} failed to detect features. Check API key and runner configuration."
+if [ "$EXIT_CODE" -ne 0 ]; then
+  RUNNER_FAILED=true
+  echo "::warning::${RUNNER} failed (exit code ${EXIT_CODE}). Check API key and runner configuration."
   echo "::warning::Runner output: ${RESPONSE}"
   RESPONSE="[]"
 fi
