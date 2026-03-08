@@ -48,23 +48,28 @@ Both skills output reports to `docs/test-reports/`:
 
 ## GitHub Action (CI)
 
-Downstream projects can run agentic tests in CI via the GitHub Action:
+Downstream projects can run agentic tests in CI via the GitHub Action. Users trigger tests by commenting `/agentic-tests` on any issue or PR:
 
 ```yaml
 - uses: GiggleLiu/agentic-tests@v1
   with:
-    runner: codex          # "codex" (default), "opencode", or "claude-code"
-    provider: openai
+    provider: anthropic
+    features: auth,api,cli
+    issue-number: ${{ github.event.issue.number }}
   env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
+
+Trigger commands:
+- `/agentic-tests` — test all configured features
+- `/agentic-tests feat1,feat2` — test specific features (overrides default)
 
 Required API key env vars per runner:
 - **codex** — `OPENAI_API_KEY`
 - **claude-code** — `ANTHROPIC_API_KEY`
 - **opencode** — depends on provider (e.g., `MOONSHOT_API_KEY`, `OPENAI_API_KEY`)
 
-The action installs the chosen runner, detects features affected by the PR diff (AI-inferred), runs `/test-feature` for each, and posts results as a PR comment with full reports as downloadable artifacts.
+The action installs the chosen runner, runs `/test-feature` (or `/test-skill`) for each listed feature, posts results as a comment on the triggering issue/PR, and uploads full reports as workflow artifacts.
 
 See `examples/agentic-test.yml` for a ready-to-copy workflow.
 
@@ -72,7 +77,7 @@ See `examples/agentic-test.yml` for a ready-to-copy workflow.
 
 - `.claude-plugin/plugin.json` / `marketplace.json` — Plugin metadata for Claude Code marketplace
 - `action.yml` — GitHub Action metadata (composite action)
-- `scripts/` — CI helper scripts (install, detect, test, comment)
+- `scripts/` — CI helper scripts (install runners, run tests, post results)
 - `examples/agentic-test.yml` — Example workflow for downstream repos
 - `docs/agent-profiles/` — Reusable agent profiles
 - `docs/plans/` — Design documents
