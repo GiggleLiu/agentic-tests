@@ -10,7 +10,7 @@ set -euo pipefail
 #   INPUT_EXTRA_PROMPT — extra instructions appended to each prompt
 #
 # Input:
-#   /tmp/affected-features.txt — one target per line (written by detect-features.sh)
+#   /tmp/affected-features.txt — one target per line (written by action.yml)
 #
 # Output:
 #   Test reports written to docs/test-reports/.
@@ -49,18 +49,7 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
   # Skip blank lines
   [[ -z "${feature}" ]] && continue
 
-  # Normalize feature name to slug: lowercase, spaces to hyphens
-  slug=$(echo "${feature}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-
-  gh_group "Testing feature: ${feature} (${slug})"
-
-  # ── Look for a matching agent profile ────────────────────────────────────
-  PROFILE_PATH=""
-  if [[ -d "${PROFILES_DIR}" ]]; then
-    PROFILE_PATH=$(find "${PROFILES_DIR}" -maxdepth 1 -name "${slug}-*.md" -type f | head -1) || true
-  fi
-
-  # ── Determine test command based on mode ─────────────────────────────────
+  # ── Determine test command and target based on mode ──────────────────────
   # In "both" mode, items may be prefixed with "feature:" or "skill:"
   # OpenCode and Claude Code use /command syntax, Codex uses $command syntax
   if [[ "${RUNNER}" == "codex" ]]; then
@@ -76,11 +65,20 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
     if [[ "${feature}" == skill:* ]]; then
       TEST_CMD="${CMD_PREFIX}test-skill"
       TARGET="${feature#skill:}"
-      slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
     elif [[ "${feature}" == feature:* ]]; then
       TARGET="${feature#feature:}"
-      slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
     fi
+  fi
+
+  # Normalize target name to slug: lowercase, spaces to hyphens
+  slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+
+  gh_group "Testing: ${TARGET} (${slug})"
+
+  # ── Look for a matching agent profile ────────────────────────────────────
+  PROFILE_PATH=""
+  if [[ -d "${PROFILES_DIR}" ]]; then
+    PROFILE_PATH=$(find "${PROFILES_DIR}" -maxdepth 1 -name "${slug}-*.md" -type f | head -1) || true
   fi
 
   # ── Build the prompt ─────────────────────────────────────────────────────
@@ -137,6 +135,17 @@ Additional instructions: ${EXTRA_PROMPT}"
   else
     echo "New report(s):"
     echo "${NEW_REPORTS}"
+    # Check report content for critical failures
+    FAIL_PATTERN='[Ff][Aa][Ii][Ll]|[Bb][Rr][Oo][Kk][Ee][Nn]|[Cc][Rr][Ii][Tt][Ii][Cc][Aa][Ll]|[Bb][Ll][Oo][Cc][Kk][Ee][Rr]'
+    PASS_PATTERN='[Pp][Aa][Ss][Ss]|[Ss][Uu][Cc][Cc][Ee][Ss][Ss]|[Ww][Oo][Rr][Kk][Ii][Nn][Gg]|[Cc][Oo][Mm][Pp][Ll][Ee][Tt][Ee]'
+    for rpt in ${NEW_REPORTS}; do
+      FAIL_COUNT=$(grep -cE "${FAIL_PATTERN}" "${rpt}" || true)
+      PASS_COUNT=$(grep -cE "${PASS_PATTERN}" "${rpt}" || true)
+      if [[ ${FAIL_COUNT} -gt ${PASS_COUNT} ]]; then
+        gh_warning "Report ${rpt} indicates failure (fail=${FAIL_COUNT}, pass=${PASS_COUNT})"
+        ALL_PASS=false
+      fi
+    done
   fi
 
   rm -f "${MARKER}"
