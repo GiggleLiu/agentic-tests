@@ -25,9 +25,8 @@ jobs:
       - name: Run agentic tests
         uses: GiggleLiu/agentic-tests@main
         with:
-          provider: moonshot
-          model: moonshotai-cn/kimi-k2.5
+          provider: openai
           mode: skill
         env:
-          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

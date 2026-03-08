@@ -5,9 +5,9 @@ description: Use when creating or managing agent profiles for testing — guides
 
 ## Create Profile
 
-Creates reusable agent profiles for test-skill and test-feature. A profile captures what to test (feature, use case, expected outcome) and who tests it (agent persona). Profiles are saved as Markdown files in `docs/agent-profiles/` and can be loaded by test-skill and test-feature.
+Creates reusable agent profiles for test-skill and test-feature. A profile captures what to test (target, use case, expected outcome) and who tests it (agent persona). Profiles are saved as Markdown files in `docs/agent-profiles/` and can be loaded by test-skill and test-feature.
 
-**Input:** `/create-profile` with no arguments starts the interactive flow. `/create-profile <feature-name>` skips to Step 2 with the feature pre-selected.
+**Input:** `/create-profile` with no arguments starts the interactive flow. `/create-profile <target-name>` skips to Step 2 with the feature or skill pre-selected.
 
 ---
 
@@ -16,10 +16,11 @@ Creates reusable agent profiles for test-skill and test-feature. A profile captu
 Determine whether the user wants to test a project feature or a skill:
 
 1. Discover features and skills from the project:
-   - **Features:** Read `README.md`, `CLAUDE.md`, `AGENTS.md`, doc files, and project structure for user-facing features.
+   - Read `README.md`, `CLAUDE.md`, `AGENTS.md`, other doc files, and project structure when present. If any expected file is missing, continue with the remaining sources instead of failing.
+   - **Features:** Extract user-facing project capabilities such as commands, workflows, APIs, integrations, or configuration systems.
    - **Skills:** Search for `SKILL.md` files under `skills/` and common locations (`~/.claude/skills/`, plugin directories).
 
-2. Present the combined list via `AskUserQuestion`:
+2. Present the combined list via `AskUserQuestion`, explicitly separating features from skills:
    ```
    What would you like to create a profile for?
 
@@ -33,10 +34,10 @@ Determine whether the user wants to test a project feature or a skill:
 
    u) Re-discover — scan project again
    ```
-   If only features or only skills were found, show just that section.
+   If only features or only skills were found, show just that section. If the user is testing a skill, record the specific skill name (for example `test-skill`) rather than a broader feature label. If the user is testing project functionality, record the feature name.
 
 3. If the user picks "Re-discover", re-scan the project and re-present.
-4. Record the chosen feature/skill name.
+4. Record the chosen target type (`feature` or `skill`), the chosen target name, and a normalized target slug (lowercase, spaces replaced with hyphens) for later filename suggestions.
 
 ### Step 2 — Define Use Case
 
@@ -54,18 +55,33 @@ Determine whether the user wants to test a project feature or a skill:
    Which use case?
    ```
 3. If the user picks "Describe your own use case", ask them to describe the scenario and expected outcome.
-4. Confirm the expected outcome with the user:
+4. Confirm the use case and expected outcome with an explicit edit loop:
    ```
    Use case: [selected use case]
    Expected outcome: [expected outcome]
 
-   Does this look right? (yes / edit)
+   Does this look right?
+   a) Accept
+   b) Edit use case
+   c) Edit expected outcome
+   d) Edit both
    ```
-5. Record the chosen use case and expected outcome.
+   - If the user picks **Edit use case**, ask for a rewritten use case, then regenerate or confirm the expected outcome again.
+   - If the user picks **Edit expected outcome**, ask for the rewritten expected outcome directly.
+   - If the user picks **Edit both**, ask for both fields explicitly and re-confirm them.
+5. Ask how the saved profile should be named:
+   ```
+   How should the saved profile be named?
+   a) Persona-based — docs/agent-profiles/[target-slug]-<persona-name>.md
+   b) Use-case-based — docs/agent-profiles/[target-slug]-[use-case-slug].md
+   c) Ask me again at save time
+   ```
+   Show one example use-case-based filename using the current target and use case. Explain that the final filename can still be adjusted before saving.
+6. Record the chosen use case, expected outcome, and naming preference.
 
 ### Step 3 — Choose Agent Persona
 
-1. Scan `docs/agent-profiles/` for files matching `<feature>-*.md` (where `<feature>` is the chosen name, lowercased, with spaces replaced by hyphens).
+1. Scan `docs/agent-profiles/` for files matching `<target-slug>-*.md`.
 2. Generate 3 diverse persona suggestions based on the feature/skill and use case. Vary experience level (beginner, intermediate, expert) and background.
 3. Present via `AskUserQuestion`:
    ```
@@ -84,14 +100,25 @@ Determine whether the user wants to test a project feature or a skill:
    Which agent profile?
    ```
    If no saved profiles exist, omit the "Load saved" section and start generated personas at (a).
-4. If the user picks a saved profile, load it and ask if they want to update the use case/expected outcome (since those may differ from what's saved).
+4. If the user picks a saved profile, load it and ask:
+   ```
+   Reuse this saved profile's persona?
+   a) Yes — keep my current use case and expected outcome
+   b) Yes — also replace my current use case and expected outcome with the saved values
+   c) No — go back to the persona choices
+   ```
 5. If the user picks a generated persona (b-d), populate the full profile fields.
-6. If the user picks "Create a custom profile", ask for background and experience level. Optionally ask for decision tendencies and quirks.
+6. If the user picks "Create a custom profile", ask for name, background, experience level, decision tendencies, and quirks. If the user only gives part of this information, ask only for the missing fields.
 7. If the user picks "Random", generate a surprising but plausible persona.
 
 ### Step 4 — Save Profile
 
-1. Present the complete profile to the user:
+1. Generate normalized slugs for the target, persona name, and use case. Build these candidate paths:
+   - Persona-based: `docs/agent-profiles/<target-slug>-<persona-slug>.md`
+   - Use-case-based: `docs/agent-profiles/<target-slug>-<use-case-slug>.md`
+   If the user already chose a naming preference in Step 2, present that option first as the recommended path.
+
+2. Present the complete profile to the user together with the filename options and a short save preview:
    ```
    Profile summary:
    - Target: [feature/skill name]
@@ -100,20 +127,49 @@ Determine whether the user wants to test a project feature or a skill:
    - Agent: [name] — [background], [experience level]
    - Tendencies: [decision tendencies]
    - Quirks: [quirks]
-   ```
 
-2. Ask via `AskUserQuestion`:
-   ```
-   Save this profile?
-   a) Save to docs/agent-profiles/[feature]-[name].md
-   b) Edit something first
-   c) Don't save — just display it
-   ```
+   Filename options:
+   a) Save as [recommended path]
+   b) Save as [alternate path]
+   c) Enter a custom filename
+   d) Edit something first
+   e) Don't save — just display it
 
-3. If saving, write the file using this format:
+   Saved file preview:
+   # [chosen filename stem]
+
+   ## Target
+   [feature/skill name]
+
+   ## Use Case
+   [use case]
+
+   ## Expected Outcome
+   [expected outcome]
+   ```
+3. If the user picks **Enter a custom filename**, ask for a path under `docs/agent-profiles/` and normalize it to a `.md` filename.
+4. If the user picks **Edit something first**, ask:
+   ```
+   What do you want to edit?
+   a) Target
+   b) Use case
+   c) Expected outcome
+   d) Persona
+   e) Filename only
+   f) Cancel
+   ```
+   Return to the corresponding step after the edit. If the user picks **Filename only**, stay in Step 4 and re-present the filename options.
+5. If the chosen path already exists, ask:
+   ```
+   That profile already exists.
+   a) Overwrite it
+   b) Choose a different filename
+   c) Cancel save
+   ```
+6. If saving, write the file using this format:
 
    ```markdown
-   # [feature]-[name]
+   # [filename stem]
 
    ## Target
    [Feature or skill name]
@@ -139,7 +195,7 @@ Determine whether the user wants to test a project feature or a skill:
    [Realistic traits that add personality]
    ```
 
-4. After saving (or displaying), offer next steps via `AskUserQuestion`:
+7. After saving (or displaying), offer next steps via `AskUserQuestion`:
    ```
    Profile ready. What next?
    a) Create another profile
