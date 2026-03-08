@@ -119,7 +119,7 @@ Present the persona to the user via `AskUserQuestion`:
 
 **Important:** Create mock files in a test-scoped location when possible (e.g., prefix with `test-` or use a temporary directory) to avoid polluting the user's actual data. When mock files must go in expected locations, track them for cleanup.
 
-**Launch the user subagent** via `Task` tool (subagent_type: `general-purpose`):
+**Launch the user subagent** (see [Cross-Platform Subagent Guide](#cross-platform-subagent-guide) below):
 
 ```
 You are role-playing as a simulated user testing a skill. Here is your persona:
@@ -152,7 +152,7 @@ The first question is: [first decision point from the skill]
 
 **Execute the target skill's phases**, following its SKILL.md instructions exactly. At each point where the skill calls `AskUserQuestion`:
 
-1. **Resume the subagent** with the question and options, plus brief conversation context
+1. **Send the question to the user subagent.** In Claude Code, resume the same subagent with the question. In OpenCode/Codex, launch a new subagent with full conversation history appended (see [Cross-Platform Subagent Guide](#cross-platform-subagent-guide)).
 2. Record the subagent's response
 3. Continue executing the skill as if the subagent's response came from a real user
 
@@ -170,7 +170,7 @@ The first question is: [first decision point from the skill]
 
 ### Step 4 — Collect Feedback & Report
 
-**Resume the subagent one final time** — stay in character. Interview the persona as the skill's agent would naturally wrap up:
+**Send one final question to the subagent** (resume in Claude Code, or launch fresh with full history in OpenCode/Codex) — stay in character. Interview the persona as the skill's agent would naturally wrap up:
 
 ```
 We're wrapping up. A few questions before you go:
@@ -256,3 +256,69 @@ Present the report path to the user and offer:
 > - **(d)** Done
 
 **Re-run shortcut:** When the user selects **(b)**, skip Step 1 entirely — the skill analysis doesn't change. Go straight to Step 2 (persona generation) with the same target skill. If a profile was used, return to Step 0c to select a new profile; otherwise go to Step 2.
+
+---
+
+### Cross-Platform Subagent Guide
+
+Subagent support varies across AI coding assistants. Use the right mechanism for your platform:
+
+#### Claude Code
+
+Use the **`Agent`** tool (also aliased as `Task`):
+- Subagents are **resumable** — launch once, then resume with new messages to continue the conversation
+- Supports **parallel** and **background** execution
+- Use `subagent_type: "general-purpose"` for the simulated user
+
+```
+# Launch
+Agent(prompt: "...", subagent_type: "general-purpose")
+# Resume at next decision point
+Agent(resume: "<agent-id>", prompt: "Next question: ...")
+```
+
+#### OpenCode
+
+Use the **`Task`** tool. Critical differences:
+- Subagents are **stateless** — each invocation is a fresh session with no memory of prior calls
+- **Cannot resume** — there is no resume mechanism
+- Parallel `Task` calls in a single response may run **sequentially** (known bug)
+
+**Workaround for statelessness:** When calling the subagent at each decision point, include the **full conversation history** in the prompt so the subagent can maintain continuity:
+
+```
+Task(prompt: """
+You are role-playing as [persona].
+[Full persona description]
+
+Here is the conversation so far:
+---
+Q1: [first question asked]
+A1: [persona's first response]
+Q2: [second question asked]
+A2: [persona's second response]
+---
+
+Now answer the next question, staying in character:
+Q3: [current question]
+""")
+```
+
+This is more verbose but ensures consistent behavior across invocations.
+
+#### Codex CLI
+
+Use **`codex exec`** via the Bash tool to launch a headless subagent:
+
+```bash
+codex --yolo exec "You are role-playing as [persona]. [Full prompt with history]"
+```
+
+For parallel fan-out (test-feature), use `spawn_agents_on_csv` if available, or run multiple `codex exec` calls with `&` and `wait`.
+
+#### Platform Detection
+
+The executing agent does not need to detect the platform explicitly. Simply attempt the subagent call using the tool available in your environment:
+- If `Agent` is available → Claude Code
+- If `Task` is available (but not `Agent`) → OpenCode
+- If neither → fall back to Bash + `codex exec` for Codex, or execute inline without subagents

@@ -91,9 +91,10 @@ jobs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
+| `runner` | `opencode` | Agent runner: `opencode` or `codex` |
 | `provider` | (required) | LLM provider: `anthropic`, `openai`, `moonshot`, etc. |
 | `mode` | `feature` | `feature` (test project features), `skill` (test skill flows), or `both` |
-| `model` | provider default | Model to use (e.g., `claude-sonnet-4-6`) |
+| `model` | runner default | Model to use (e.g., `claude-sonnet-4-6`, `gpt-5.4`) |
 | `features` | `auto` | `auto` = AI-detect from diff, or comma-separated explicit list |
 | `profiles-dir` | `docs/agent-profiles` | Directory containing saved agent profiles |
 | `base-branch` | `origin/main` | Base branch for diff comparison |
@@ -127,6 +128,17 @@ with:
   provider: openai
   model: gpt-4o
   extra-prompt: 'focus on error handling and edge cases'
+```
+
+Use Codex as the runner:
+```yaml
+with:
+  runner: codex
+  provider: openai
+  model: gpt-5.4
+env:
+  CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 Explicit feature list (skip AI detection):

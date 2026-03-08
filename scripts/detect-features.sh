@@ -2,6 +2,7 @@
 # Detect which features or skills are affected by the current PR diff.
 #
 # Env vars (from action.yml):
+#   INPUT_RUNNER     — "opencode" or "codex"
 #   INPUT_MODE       — "feature", "skill", or "both"
 #   INPUT_FEATURES   — "auto" or comma-separated list
 #   INPUT_BASE_BRANCH — base branch for diff (default: origin/main)
@@ -9,6 +10,7 @@
 # Output: writes one item per line to /tmp/affected-features.txt
 set -euo pipefail
 
+RUNNER="${INPUT_RUNNER:-opencode}"
 MODE="${INPUT_MODE:-feature}"
 FEATURES_INPUT="${INPUT_FEATURES:-${1:-auto}}"
 BASE_BRANCH="${INPUT_BASE_BRANCH:-${2:-origin/main}}"
@@ -74,13 +76,17 @@ Return ONLY a JSON array of name strings. No explanation, no markdown, just the 
 Example: [\"authentication\", \"REST API\"]
 If nothing is affected, return: []"
 
-# Call OpenCode
-RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
+# Call the agent runner
+if [ "$RUNNER" = "codex" ]; then
+  RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>/dev/null || echo "[]")
+else
+  RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
+fi
 
-# Extract JSON array from response (OpenCode may add extra text)
+# Extract JSON array from response (runner may add extra text)
 JSON=$(echo "$RESPONSE" | grep -o '\[.*\]' | head -1)
 if [ -z "$JSON" ]; then
-  echo "::warning::Could not parse response from OpenCode. No targets detected."
+  echo "::warning::Could not parse response from ${RUNNER}. No targets detected."
   echo -n > "$OUTPUT_FILE"
   echo "::endgroup::"
   exit 0

@@ -4,6 +4,7 @@ set -euo pipefail
 # run-tests.sh — Run agentic tests for each detected feature or skill.
 #
 # Env vars (from action.yml):
+#   INPUT_RUNNER       — "opencode" or "codex"
 #   INPUT_MODE         — "feature", "skill", or "both"
 #   INPUT_PROFILES_DIR — profiles directory (default: docs/agent-profiles)
 #   INPUT_EXTRA_PROMPT — extra instructions appended to each prompt
@@ -15,6 +16,7 @@ set -euo pipefail
 #   Test reports written to docs/test-reports/.
 #   Sets GitHub Actions outputs via $GITHUB_OUTPUT.
 
+RUNNER="${INPUT_RUNNER:-opencode}"
 MODE="${INPUT_MODE:-feature}"
 PROFILES_DIR="${INPUT_PROFILES_DIR:-${1:-docs/agent-profiles}}"
 EXTRA_PROMPT="${INPUT_EXTRA_PROMPT:-}"
@@ -60,13 +62,19 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
 
   # ── Determine test command based on mode ─────────────────────────────────
   # In "both" mode, items may be prefixed with "feature:" or "skill:"
-  TEST_CMD="/test-feature"
+  # OpenCode uses /command syntax, Codex uses $command syntax
+  if [[ "${RUNNER}" == "codex" ]]; then
+    CMD_PREFIX='$'
+  else
+    CMD_PREFIX="/"
+  fi
+  TEST_CMD="${CMD_PREFIX}test-feature"
   TARGET="${feature}"
   if [[ "${MODE}" == "skill" ]]; then
-    TEST_CMD="/test-skill"
+    TEST_CMD="${CMD_PREFIX}test-skill"
   elif [[ "${MODE}" == "both" ]]; then
     if [[ "${feature}" == skill:* ]]; then
-      TEST_CMD="/test-skill"
+      TEST_CMD="${CMD_PREFIX}test-skill"
       TARGET="${feature#skill:}"
       slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
     elif [[ "${feature}" == feature:* ]]; then
@@ -95,12 +103,17 @@ Additional instructions: ${EXTRA_PROMPT}"
   MARKER="/tmp/test-marker-${slug}"
   touch "${MARKER}"
 
-  # ── Execute OpenCode ─────────────────────────────────────────────────────
+  # ── Execute agent runner ─────────────────────────────────────────────────
   LOG_FILE="/tmp/test-${slug}.log"
-  echo "Running: opencode -p \"${PROMPT}\" -q"
 
   set +e
-  opencode -p "${PROMPT}" -q 2>&1 | tee "${LOG_FILE}"
+  if [[ "${RUNNER}" == "codex" ]]; then
+    echo "Running: codex exec \"${PROMPT}\""
+    codex exec --full-auto --sandbox workspace-write "${PROMPT}" 2>&1 | tee "${LOG_FILE}"
+  else
+    echo "Running: opencode -p \"${PROMPT}\" -q"
+    opencode -p "${PROMPT}" -q 2>&1 | tee "${LOG_FILE}"
+  fi
   EXIT_CODE=${PIPESTATUS[0]}
   set -e
 

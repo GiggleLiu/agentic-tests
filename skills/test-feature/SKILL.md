@@ -53,7 +53,7 @@ Print a brief summary of the project and features to test. Proceed immediately.
 
 ### Step 2 — Test Each Feature
 
-For each feature, dispatch a **subagent** (via Agent tool). Give the subagent:
+For each feature, dispatch a **subagent** (see [Cross-Platform Subagent Guide](#cross-platform-subagent-guide) below). Give the subagent:
 
 - **Role:** From the profile's Agent section (background, experience level, decision tendencies, quirks). If no profile was selected, infer a lightweight user description relevant to the feature and project type.
 - **Use case:** From the profile's Use Case field. If no profile, infer from the feature's purpose.
@@ -90,7 +90,7 @@ Your task — act as a real user with the above persona:
    - **Doc suggestions:** What would you add or change in the docs?
 ```
 
-**Parallelism:** Independent features can be tested in parallel via multiple subagents.
+**Parallelism:** Independent features can be tested in parallel via multiple subagents. Note: in OpenCode, parallel `Task` calls may execute sequentially (known limitation). The skill works correctly either way — parallelism is a performance optimization, not a correctness requirement.
 
 ### Step 3 — Report
 
@@ -136,3 +136,51 @@ Gather results from all subagents. Save report to `docs/test-reports/test-featur
 ```
 
 Present the report path. Offer to fix documentation gaps or re-test specific features.
+
+---
+
+### Cross-Platform Subagent Guide
+
+Subagent support varies across AI coding assistants. Use the right mechanism for your platform:
+
+#### Claude Code
+
+Use the **`Agent`** tool (also aliased as `Task`):
+- Supports **parallel** execution — dispatch multiple subagents simultaneously for independent features
+- Supports **background** execution — subagents run without blocking
+- Use `subagent_type: "general-purpose"` for simulated users
+
+```
+# Dispatch one subagent per feature (can be parallel)
+Agent(prompt: "You are [role]. Test [feature]...", subagent_type: "general-purpose")
+```
+
+#### OpenCode
+
+Use the **`Task`** tool. Key differences:
+- Subagents are **stateless** — each invocation is a fresh session (no resume)
+- Parallel `Task` calls may run **sequentially** (known limitation) — this is fine for correctness, just slower
+- Each subagent gets its own full prompt with all context needed
+
+```
+Task(prompt: "You are [role]. Test [feature]. Here are the docs: [content]...")
+```
+
+Since test-feature subagents are independent (one per feature, no shared state), the stateless model works naturally — each subagent gets all context it needs in a single prompt.
+
+#### Codex CLI
+
+Use **`codex exec`** via the Bash tool:
+
+```bash
+codex --yolo exec "You are [role]. Test [feature]. Docs: [content]..."
+```
+
+For parallel testing, use `spawn_agents_on_csv` if available (write features to a CSV, dispatch workers), or run multiple `codex exec &` calls and `wait`.
+
+#### Platform Detection
+
+The executing agent does not need to detect the platform explicitly. Simply attempt the subagent call using the tool available in your environment:
+- If `Agent` is available → Claude Code
+- If `Task` is available (but not `Agent`) → OpenCode
+- If neither → fall back to Bash + `codex exec` for Codex, or execute inline without subagents
