@@ -48,22 +48,25 @@ RELEASE_JSON=$(curl -fsSL "${CURL_HEADERS[@]}" "${API_URL}") || {
 ASSET_URL=""
 ASSET_NAME=""
 
-for pattern in 'x86_64.*linux.*\.tar\.gz' 'linux.*amd64.*\.tar\.gz' 'linux.*x86_64.*\.tar\.gz'; do
-  ASSET_URL=$(echo "${RELEASE_JSON}" | \
-    python3 -c "
+ASSET_URL=$(echo "${RELEASE_JSON}" | \
+  python3 -c "
 import sys, json, re
 data = json.load(sys.stdin)
+# Match 'codex-<arch>-...-linux-...' but exclude proxy/runner/sandbox variants
 for asset in data.get('assets', []):
     name = asset['name']
-    if re.search(r'${pattern}', name):
+    if re.match(r'^codex-(x86_64|aarch64).*linux.*\.tar\.gz$', name) \
+       and 'responses-api-proxy' not in name \
+       and 'command-runner' not in name \
+       and 'sandbox' not in name \
+       and 'npm' not in name:
         print(asset['browser_download_url'])
         break
 " 2>/dev/null) || true
-  if [[ -n "${ASSET_URL}" ]]; then
-    ASSET_NAME=$(basename "${ASSET_URL}")
-    break
-  fi
-done
+
+if [[ -n "${ASSET_URL}" ]]; then
+  ASSET_NAME=$(basename "${ASSET_URL}")
+fi
 
 if [[ -z "${ASSET_URL}" ]]; then
   gh_error "Could not find a linux/amd64 asset in the latest release of ${REPO}"
