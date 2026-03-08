@@ -49,7 +49,11 @@ ln -s ~/.config/opencode/agentic-tests/skills/agentic-tests ~/.config/opencode/s
 
 ## CI Integration
 
-Run agentic tests automatically on pull requests via the GitHub Action:
+Run agentic tests automatically on pull requests via the GitHub Action. The action uses [OpenCode](https://github.com/opencode-ai/opencode) (open-source, headless) with your LLM API key.
+
+### Quick Start
+
+Copy `examples/agentic-test.yml` to `.github/workflows/` in your repo, then add your API key as a repository secret (`Settings > Secrets > Actions`).
 
 ```yaml
 # .github/workflows/agentic-test.yml
@@ -68,7 +72,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: GiggleLiu/agentic-tests@v1
+      - uses: GiggleLiu/agentic-tests@main
         with:
           provider: anthropic
         env:
@@ -76,9 +80,61 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-The action detects which features are affected by the PR diff, tests each with a simulated user, and posts results as a PR comment. Full reports are uploaded as workflow artifacts.
+### How It Works
 
-See `examples/agentic-test.yml` for more options (model selection, explicit feature lists, custom profile directories).
+1. **Installs OpenCode** and registers agentic-tests skills as OpenCode commands
+2. **Detects affected targets** — uses AI to infer which features or skills changed in the PR (from the diff + project docs like README.md, CLAUDE.md)
+3. **Runs tests** — dispatches `/test-feature` or `/test-skill` for each target, with matching agent profiles if available
+4. **Reports results** — posts a summary table as a PR comment; uploads full reports as workflow artifacts
+
+### Inputs
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `provider` | (required) | LLM provider: `anthropic`, `openai`, `moonshot`, etc. |
+| `mode` | `feature` | `feature` (test project features), `skill` (test skill flows), or `both` |
+| `model` | provider default | Model to use (e.g., `claude-sonnet-4-6`) |
+| `features` | `auto` | `auto` = AI-detect from diff, or comma-separated explicit list |
+| `profiles-dir` | `docs/agent-profiles` | Directory containing saved agent profiles |
+| `base-branch` | `origin/main` | Base branch for diff comparison |
+| `extra-prompt` | | Extra instructions appended to each test (e.g., `test as a beginner`) |
+
+### Modes
+
+- **`feature`** — tests project features via `/test-feature`. Simulated users read docs, install, and exercise code. Best for libraries, CLIs, web services.
+- **`skill`** — tests skill flows via `/test-skill`. Role-plays through each SKILL.md with a simulated user persona. Best for skill/plugin repos.
+- **`both`** — runs both. Detection returns items prefixed `feature:name` or `skill:name`.
+
+### Examples
+
+Test a library's features:
+```yaml
+with:
+  provider: anthropic
+  mode: feature
+```
+
+Test a skill repo's conversational flows:
+```yaml
+with:
+  provider: anthropic
+  mode: skill
+```
+
+Test with custom instructions:
+```yaml
+with:
+  provider: openai
+  model: gpt-4o
+  extra-prompt: 'focus on error handling and edge cases'
+```
+
+Explicit feature list (skip AI detection):
+```yaml
+with:
+  provider: anthropic
+  features: 'authentication,REST API,CLI commands'
+```
 
 ## Reports
 

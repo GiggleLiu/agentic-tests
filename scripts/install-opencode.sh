@@ -98,6 +98,9 @@ EXTRACT_DIR="${TMPDIR_WORK}/extract"
 mkdir -p "${EXTRACT_DIR}"
 
 case "${ASSET_NAME}" in
+  *.deb)
+    sudo dpkg -i "${DOWNLOAD_PATH}"
+    ;;
   *.tar.gz | *.tgz)
     tar -xzf "${DOWNLOAD_PATH}" -C "${EXTRACT_DIR}"
     ;;
@@ -111,23 +114,26 @@ case "${ASSET_NAME}" in
     ;;
 esac
 
-# Locate the binary inside the extracted tree
-BINARY_PATH=""
-if [[ -f "${EXTRACT_DIR}/${BINARY_NAME}" ]]; then
-  BINARY_PATH="${EXTRACT_DIR}/${BINARY_NAME}"
-else
-  # Search recursively for a file named opencode (case-insensitive)
-  BINARY_PATH=$(find "${EXTRACT_DIR}" -type f -name "${BINARY_NAME}" | head -n 1)
-fi
+# For .deb installs, dpkg handles placement — skip manual install
+if [[ "${ASSET_NAME}" != *.deb ]]; then
+  # Locate the binary inside the extracted tree
+  BINARY_PATH=""
+  if [[ -f "${EXTRACT_DIR}/${BINARY_NAME}" ]]; then
+    BINARY_PATH="${EXTRACT_DIR}/${BINARY_NAME}"
+  else
+    # Search recursively for a file named opencode (case-insensitive)
+    BINARY_PATH=$(find "${EXTRACT_DIR}" -type f -name "${BINARY_NAME}" | head -n 1)
+  fi
 
-if [[ -z "${BINARY_PATH}" || ! -f "${BINARY_PATH}" ]]; then
-  gh_error "Could not locate '${BINARY_NAME}' binary after extraction"
-  ls -R "${EXTRACT_DIR}" >&2
-  exit 1
-fi
+  if [[ -z "${BINARY_PATH}" || ! -f "${BINARY_PATH}" ]]; then
+    gh_error "Could not locate '${BINARY_NAME}' binary after extraction"
+    ls -R "${EXTRACT_DIR}" >&2
+    exit 1
+  fi
 
-chmod +x "${BINARY_PATH}"
-sudo install -m 0755 "${BINARY_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
+  chmod +x "${BINARY_PATH}"
+  sudo install -m 0755 "${BINARY_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
+fi
 
 echo "Installed ${INSTALL_DIR}/${BINARY_NAME}"
 gh_endgroup

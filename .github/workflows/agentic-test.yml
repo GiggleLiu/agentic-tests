@@ -1,6 +1,6 @@
 # Agentic Tests — dogfood: test this plugin's own skills with simulated users
 #
-# Requires: ANTHROPIC_API_KEY secret (Settings > Secrets > Actions)
+# Requires: MOONSHOT_API_KEY secret (Settings > Secrets > Actions)
 
 name: Agentic Tests
 
@@ -25,8 +25,9 @@ jobs:
       - name: Run agentic tests
         uses: GiggleLiu/agentic-tests@main
         with:
-          provider: anthropic
+          provider: moonshot
+          model: moonshotai-cn/kimi-k2.5
           mode: skill
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
