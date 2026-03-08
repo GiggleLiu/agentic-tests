@@ -31,13 +31,10 @@ Determine whether the user wants to test a project feature or a skill:
    Skills:
    c) [Skill 1] — [description]
    d) [Skill 2] — [description]
-
-   u) Re-discover — scan project again
    ```
    If only features or only skills were found, show just that section. If the user is testing a skill, record the specific skill name (for example `test-skill`) rather than a broader feature label. If the user is testing project functionality, record the feature name.
 
-3. If the user picks "Re-discover", re-scan the project and re-present.
-4. Record the chosen target type (`feature` or `skill`), the chosen target name, and a normalized target slug (lowercase, spaces replaced with hyphens) for later filename suggestions.
+3. Record the chosen target type (`feature` or `skill`), the chosen target name, and a normalized target slug (lowercase, spaces replaced with hyphens) for later filename suggestions.
 
 ### Step 2 — Define Use Case
 
@@ -55,60 +52,28 @@ Determine whether the user wants to test a project feature or a skill:
    Which use case?
    ```
 3. If the user picks "Describe your own use case", ask them to describe the scenario and expected outcome.
-4. Confirm the use case and expected outcome with an explicit edit loop:
-   ```
-   Use case: [selected use case]
-   Expected outcome: [expected outcome]
-
-   Does this look right?
-   a) Accept
-   b) Edit use case
-   c) Edit expected outcome
-   d) Edit both
-   ```
-   - If the user picks **Edit use case**, ask for a rewritten use case, then regenerate or confirm the expected outcome again.
-   - If the user picks **Edit expected outcome**, ask for the rewritten expected outcome directly.
-   - If the user picks **Edit both**, ask for both fields explicitly and re-confirm them.
-5. Record the chosen use case and expected outcome. Do not ask about filenames yet; leave save decisions for Step 4 after the persona is finalized.
+4. Record the chosen use case and expected outcome. Do not ask follow-up edit questions; continue directly to persona selection.
 
 ### Step 3 — Choose Agent Persona
 
-1. Scan `docs/agent-profiles/` for files matching `<target-slug>-*.md`. Prefer profiles whose `## Target Type` exactly matches the chosen target type. If the field is missing, treat the file as a legacy profile and only offer it when its `## Target` clearly matches the chosen target.
-2. Generate 3 diverse persona suggestions based on the feature/skill and use case. Vary experience level (beginner, intermediate, expert) and background.
-3. Present via `AskUserQuestion`:
+1. Generate 3 diverse persona suggestions based on the feature/skill and use case. Vary experience level (beginner, intermediate, expert) and background.
+2. Present via `AskUserQuestion`:
    ```
    Agent profile options:
-   [If saved profiles exist:]
-   a) Load saved: [profile-name] — [background summary]
-   [... additional saved profiles ...]
-
-   Generated personas:
+   a) [Name] — [Experience level], [one-line background summary]
    b) [Name] — [Experience level], [one-line background summary]
    c) [Name] — [Experience level], [one-line background summary]
-   d) [Name] — [Experience level], [one-line background summary]
-   e) Create a custom profile (I'll describe the persona)
-   f) Random (generate a surprising persona)
 
    Which agent profile?
    ```
-   If no saved profiles exist, omit the "Load saved" section and start generated personas at (a).
-4. If the user picks a saved profile, load it and ask:
-   ```
-   Reuse this saved profile's persona?
-   a) Yes — keep my current use case and expected outcome
-   b) Yes — also replace my current use case and expected outcome with the saved values
-   c) No — go back to the persona choices
-   ```
-5. If the user picks a generated persona (b-d), populate the full profile fields.
-6. If the user picks "Create a custom profile", ask for name, background, experience level, decision tendencies, and quirks. If the user only gives part of this information, ask only for the missing fields.
-7. If the user picks "Random", generate a surprising but plausible persona.
+3. If the user picks a generated persona (a-c), populate the full profile fields.
 
 ### Step 4 — Save Profile
 
 1. Generate normalized slugs for the target, persona name, and use case. Slugs must contain only lowercase letters, numbers, and hyphens. Always build the save path as:
    - `docs/agent-profiles/<target-slug>-<use-case-slug>-<persona-slug>.md`
 
-2. Present the complete profile to the user together with the save choices and a short save preview:
+2. Present the complete profile to the user together with a short save preview. Then save it immediately using the generated path unless there is a filename collision:
    ```
    Profile summary:
    - Target Type: [feature/skill]
@@ -118,10 +83,6 @@ Determine whether the user wants to test a project feature or a skill:
    - Agent: [name] — [background], [experience level]
    - Tendencies: [decision tendencies]
    - Quirks: [quirks]
-
-   Next action:
-   a) Save as [target-usecase-persona path]
-   b) Don't save — just display it
 
    Saved file preview:
    # [chosen filename stem]
@@ -178,7 +139,7 @@ Determine whether the user wants to test a project feature or a skill:
    [Realistic traits that add personality]
    ```
 
-5. After saving (or displaying), offer next steps via `AskUserQuestion`:
+5. After saving, offer next steps via `AskUserQuestion`:
    ```
    Profile ready. What next?
    a) Create another profile

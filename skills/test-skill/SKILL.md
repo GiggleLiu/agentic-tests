@@ -17,21 +17,23 @@ A general-purpose skill testing framework. It executes any skill's SKILL.md by r
 
 **If a profile path was provided as an argument:** Read the profile file directly only if its canonical path resolves inside `docs/agent-profiles/`. Reject absolute paths, `..` traversal, home-directory references, and symlink escapes outside that directory. Require `## Target Type` to be `skill` when present. Extract Target (skill name), Use Case, Expected Outcome, and Agent fields. Skip the selection UI below and proceed to Step 1.
 
-**Otherwise:** Scan `docs/agent-profiles/` for saved profile files (`*.md`). Only offer profiles whose `## Target Type` is `skill`. If the field is missing, treat the file as legacy and only offer it when its `## Target` matches one of the discovered skills. Present via `AskUserQuestion`:
+**Otherwise:** Scan `docs/agent-profiles/` for saved profile files (`*.md`). Only offer profiles whose `## Target Type` is `skill`. If the field is missing, treat the file as legacy and only offer it when its `## Target` matches one of the discovered skills.
+
+- If there is exactly one matching saved profile, auto-load it, briefly tell the user which profile was selected, and proceed directly to Step 1.
+- If there are multiple matching saved profiles, present them via `AskUserQuestion`:
 
 ```
-Choose how to start:
-[If saved profiles exist:]
+Choose a saved profile for this run:
 a) [profile-name] — [skill]: [use case summary]
 [... additional profiles ...]
-
-b) Temporary profile — continue without saving first
 ```
 
-If no saved profiles exist, omit option (a) and show only "Temporary profile."
+If the user does not choose one of the listed saved profiles, continue without a saved profile and internally auto-generate an ephemeral use case and expected outcome for this run. Step 2 will derive the persona from that use case.
+
+If no saved profiles exist, skip this selection UI and continue immediately with an internally generated ephemeral profile.
 
 - **Load saved:** Read the profile file. Extract Target Type, Target (skill name), Use Case, Expected Outcome, and Agent fields. The skill name determines the target skill for Step 1. Agent fields pre-populate Step 2.
-- **Temporary profile:** Continue in this skill without saving first. Resolve one skill, then auto-generate the use case, expected outcome, and persona for this run.
+- **Ephemeral fallback:** Continue in this skill without saving first. Resolve one skill, then internally auto-generate the use case and expected outcome for this run. Step 2 derives the persona from that use case and proceeds without asking for confirmation.
 
 ### Step 1 — Choose Target & Analyze
 
@@ -55,43 +57,32 @@ Once the user selects a skill (or the Step 0 selection is confirmed), read its f
 - Phases that reference files or context without checking if they exist first
 - Asymmetric option handling (e.g., option (a) has a follow-up but (b) and (c) don't)
 
-Present this structural analysis to the user, including any flagged issues. Example format:
-
-```
-## Skill Analysis: [name]
-
-**Phases:** [list with brief descriptions]
-**Decision points:** [count] AskUserQuestion calls identified
-**Preconditions:**
-  - [file/context] — [required/optional]
-**Expected outputs:**
-  - [file path] — [description]
-**Dependencies:**
-  - [skill/service] — [how it's used]
-**Structural flags:**
-  - [issue] at [location]
-```
-
-Default behavior: after presenting the analysis, proceed directly to Step 2.
+Keep this structural analysis internal by default. Use it to drive persona generation, precondition setup, and later reporting. Do not present the full analysis to the user unless it changes what can be tested.
 
 Only stop for an extra `AskUserQuestion` if either:
-- the analysis found a blocking precondition or major structural ambiguity that needs a decision before testing, or
-- the user explicitly asks to narrow the scope.
+- the analysis found a blocking precondition or major structural ambiguity that prevents a meaningful test run, or
+- the user explicitly asks about the blocker before the run.
 
 In those cases, ask:
 
-> "Here's what I found. How should we continue?"
-> - **(a)** Proceed — test the default flow
-> - **(b)** Focus on specific phases — choose which phases to test
-> - **(c)** Adjust preconditions — set up specific mock context before testing
+Explain briefly:
+- what the skill expected
+- what is missing, ambiguous, or blocked
+- why the test cannot proceed as planned
+
+Then ask the user:
+
+> "This is what blocked the test. How would you like me to fix or work around it?"
+
+Keep this explanation focused on the blocking issue. Do not dump the full structural analysis unless the user asks for it.
 
 ### Step 2 — Generate Persona
 
-**If a profile was loaded in Step 0 with Agent details:** Pre-populate the persona from the profile fields (Background, Experience Level, Decision Tendencies, Quirks). Infer Motivation from the profile's Use Case. Present the pre-populated persona to the user for adjustment (see below).
+**If a profile was loaded in Step 0 with Agent details:** Pre-populate the persona from the profile fields (Background, Experience Level, Decision Tendencies, Quirks). Infer Motivation from the profile's Use Case.
 
-**If a temporary profile was selected in Step 0:** Run the full persona generation below as if no profile exists.
+**If the ephemeral fallback was used in Step 0:** Run the full persona generation below using the generated use case and expected outcome.
 
-**If a profile was loaded but has no Agent details:** Auto-generate a persona based on the use case and skill analysis, then present for adjustment.
+**If a profile was loaded but has no Agent details:** Auto-generate a persona based on the use case and skill analysis.
 
 **If no profile was loaded in Step 0:** Analyze the skill to infer what kind of user it serves. Consider:
 
@@ -107,14 +98,7 @@ Generate a persona with:
 - **Decision tendencies** — how they'll behave at choice points (e.g., "explores broadly before committing", "wants quick results", "pushes back on suggestions", "asks lots of clarifying questions")
 - **Quirks** — one or two realistic traits that make them not a perfectly compliant test subject (e.g., "sometimes goes off on tangents", "skeptical of AI-generated suggestions", "changes their mind after seeing options")
 
-Present the persona to the user via `AskUserQuestion`:
-
-> "[Persona description]"
-> - **(a)** Looks good — start the test
-> - **(b)** Make them more challenging — increase pushback and skepticism
-> - **(c)** Make them more cooperative — reduce friction, focus on happy path
-> - **(d)** Adversarial — generate a persona designed to break assumptions (one-word answers, misunderstandings, off-topic tangents, ignores instructions)
-> - **(e)** Let me describe a custom persona
+The use case remains the main driver of the test. Persona should shape how the simulated user behaves, not what the test is fundamentally trying to accomplish.
 
 ### Step 3 — Execute the Skill with Role Play
 
@@ -269,12 +253,14 @@ Set `**Verdict:** fail` whenever the tested flow contains a blocking or high-sev
 Present the report path to the user and offer:
 
 > "Test complete. Report saved to `docs/test-reports/[file]`. What next?"
-> - **(a)** Review the report together — walk through findings
+> - **(a)** Review together and fix found issues
 > - **(b)** Re-run this skill with a new persona
 > - **(c)** Test a different skill
 > - **(d)** Done
 
-If this run used a temporary profile, offer to save it before exiting using the standard `target-usecase-persona` filename.
+If this run used the ephemeral fallback, offer to save it before exiting using the standard `target-usecase-persona` filename.
+
+**Review-and-fix path:** When the user selects **(a)**, walk through the report with them, prioritize the most important issues found, and fix those issues in the target skill or closely related docs before offering another test run.
 
 **Re-run shortcut:** When the user selects **(b)**, keep the same target skill and analysis context. Go straight to Step 2 to generate or choose a new persona, then run the test again. Do not send the user back through Step 0 or Step 1 unless they explicitly ask to change the target skill.
 
