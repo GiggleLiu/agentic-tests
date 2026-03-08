@@ -58,7 +58,7 @@ Downstream projects can run agentic tests in CI via the GitHub Action:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-The action installs OpenCode or Codex (configurable via `runner` input), detects features affected by the PR diff (AI-inferred), runs `/test-feature` for each, and posts results as a PR comment with full reports as downloadable artifacts.
+The action installs the chosen runner (OpenCode, Codex, or Claude Code — configurable via `runner` input), detects features affected by the PR diff (AI-inferred), runs `/test-feature` for each, and posts results as a PR comment with full reports as downloadable artifacts.
 
 See `examples/agentic-test.yml` for a ready-to-copy workflow.
 

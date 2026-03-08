@@ -62,7 +62,7 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
 
   # ── Determine test command based on mode ─────────────────────────────────
   # In "both" mode, items may be prefixed with "feature:" or "skill:"
-  # OpenCode uses /command syntax, Codex uses $command syntax
+  # OpenCode and Claude Code use /command syntax, Codex uses $command syntax
   if [[ "${RUNNER}" == "codex" ]]; then
     CMD_PREFIX='$'
   else
@@ -107,13 +107,20 @@ Additional instructions: ${EXTRA_PROMPT}"
   LOG_FILE="/tmp/test-${slug}.log"
 
   set +e
-  if [[ "${RUNNER}" == "codex" ]]; then
-    echo "Running: codex exec \"${PROMPT}\""
-    codex exec --full-auto --sandbox workspace-write "${PROMPT}" 2>&1 | tee "${LOG_FILE}"
-  else
-    echo "Running: opencode -p \"${PROMPT}\" -q"
-    opencode -p "${PROMPT}" -q 2>&1 | tee "${LOG_FILE}"
-  fi
+  case "${RUNNER}" in
+    codex)
+      echo "Running: codex exec \"${PROMPT}\""
+      codex exec --full-auto --sandbox workspace-write "${PROMPT}" 2>&1 | tee "${LOG_FILE}"
+      ;;
+    claude-code)
+      echo "Running: claude -p \"${PROMPT}\""
+      claude -p "${PROMPT}" --allowedTools "Bash,Read,Write,Edit,Glob,Grep,Agent" --no-session-persistence 2>&1 | tee "${LOG_FILE}"
+      ;;
+    *)
+      echo "Running: opencode -p \"${PROMPT}\" -q"
+      opencode -p "${PROMPT}" -q 2>&1 | tee "${LOG_FILE}"
+      ;;
+  esac
   EXIT_CODE=${PIPESTATUS[0]}
   set -e
 

@@ -49,7 +49,7 @@ ln -s ~/.config/opencode/agentic-tests/skills/agentic-tests ~/.config/opencode/s
 
 ## CI Integration
 
-Run agentic tests automatically on pull requests via the GitHub Action. The action uses [OpenCode](https://github.com/opencode-ai/opencode) (open-source, headless) with your LLM API key.
+Run agentic tests automatically on pull requests via the GitHub Action. Supports three runners: [OpenCode](https://github.com/opencode-ai/opencode), [Codex](https://github.com/openai/codex), and [Claude Code](https://claude.ai/code).
 
 ### Quick Start
 
@@ -82,7 +82,7 @@ jobs:
 
 ### How It Works
 
-1. **Installs OpenCode** and registers agentic-tests skills as OpenCode commands
+1. **Installs the agent runner** (OpenCode, Codex, or Claude Code) and registers agentic-tests skills
 2. **Detects affected targets** — uses AI to infer which features or skills changed in the PR (from the diff + project docs like README.md, CLAUDE.md)
 3. **Runs tests** — dispatches `/test-feature` or `/test-skill` for each target, with matching agent profiles if available
 4. **Reports results** — posts a summary table as a PR comment; uploads full reports as workflow artifacts
@@ -91,7 +91,7 @@ jobs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `runner` | `opencode` | Agent runner: `opencode` or `codex` |
+| `runner` | `opencode` | Agent runner: `opencode`, `codex`, or `claude-code` |
 | `provider` | (required) | LLM provider: `anthropic`, `openai`, `moonshot`, etc. |
 | `mode` | `feature` | `feature` (test project features), `skill` (test skill flows), or `both` |
 | `model` | runner default | Model to use (e.g., `claude-sonnet-4-6`, `gpt-5.4`) |
@@ -128,6 +128,17 @@ with:
   provider: openai
   model: gpt-4o
   extra-prompt: 'focus on error handling and edge cases'
+```
+
+Use Claude Code as the runner:
+```yaml
+with:
+  runner: claude-code
+  provider: anthropic
+  model: claude-opus-4-6
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 Use Codex as the runner:

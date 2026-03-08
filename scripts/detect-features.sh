@@ -77,11 +77,17 @@ Example: [\"authentication\", \"REST API\"]
 If nothing is affected, return: []"
 
 # Call the agent runner
-if [ "$RUNNER" = "codex" ]; then
-  RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>/dev/null || echo "[]")
-else
-  RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
-fi
+case "$RUNNER" in
+  codex)
+    RESPONSE=$(codex exec --full-auto --sandbox workspace-write "$PROMPT" 2>/dev/null || echo "[]")
+    ;;
+  claude-code)
+    RESPONSE=$(claude -p "$PROMPT" --allowedTools "Bash,Read,Glob,Grep" --no-session-persistence 2>/dev/null || echo "[]")
+    ;;
+  *)
+    RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
+    ;;
+esac
 
 # Extract JSON array from response (runner may add extra text)
 JSON=$(echo "$RESPONSE" | grep -o '\[.*\]' | head -1)
