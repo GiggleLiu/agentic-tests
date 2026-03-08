@@ -7,12 +7,9 @@ name: Agentic Tests
 on:
   schedule:
     - cron: '0 8 * * 1'   # Every Monday at 08:00 UTC
-  pull_request:
-    types: [opened, synchronize]
   workflow_dispatch:
 
 permissions:
-  pull-requests: write
   contents: read
 
 jobs:
@@ -30,7 +27,7 @@ jobs:
           runner: codex
           provider: openai
           mode: skill
-          features: ${{ github.event_name == 'pull_request' && 'auto' || 'test-skill,test-feature,create-profile' }}
+          features: test-skill,test-feature,create-profile
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
