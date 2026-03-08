@@ -69,15 +69,7 @@ Determine whether the user wants to test a project feature or a skill:
    - If the user picks **Edit use case**, ask for a rewritten use case, then regenerate or confirm the expected outcome again.
    - If the user picks **Edit expected outcome**, ask for the rewritten expected outcome directly.
    - If the user picks **Edit both**, ask for both fields explicitly and re-confirm them.
-5. Ask how the saved profile should be named:
-   ```
-   How should the saved profile be named?
-   a) Persona-based — docs/agent-profiles/[target-slug]-<persona-name>.md
-   b) Use-case-based — docs/agent-profiles/[target-slug]-[use-case-slug].md
-   c) Ask me again at save time
-   ```
-   Show one example use-case-based filename using the current target and use case. Explain that the final filename can still be adjusted before saving.
-6. Record the chosen use case, expected outcome, and naming preference.
+5. Record the chosen use case and expected outcome. Do not ask about filenames yet; leave save decisions for Step 4 after the persona is finalized.
 
 ### Step 3 — Choose Agent Persona
 
@@ -113,12 +105,10 @@ Determine whether the user wants to test a project feature or a skill:
 
 ### Step 4 — Save Profile
 
-1. Generate normalized slugs for the target, persona name, and use case. Slugs must contain only lowercase letters, numbers, and hyphens. Build these candidate paths:
-   - Persona-based: `docs/agent-profiles/<target-slug>-<persona-slug>.md`
-   - Use-case-based: `docs/agent-profiles/<target-slug>-<use-case-slug>.md`
-   If the user already chose a naming preference in Step 2, present that option first as the recommended path.
+1. Generate normalized slugs for the target, persona name, and use case. Slugs must contain only lowercase letters, numbers, and hyphens. Always build the save path as:
+   - `docs/agent-profiles/<target-slug>-<use-case-slug>-<persona-slug>.md`
 
-2. Present the complete profile to the user together with the filename options and a short save preview:
+2. Present the complete profile to the user together with the save choices and a short save preview:
    ```
    Profile summary:
    - Target Type: [feature/skill]
@@ -129,12 +119,9 @@ Determine whether the user wants to test a project feature or a skill:
    - Tendencies: [decision tendencies]
    - Quirks: [quirks]
 
-   Filename options:
-   a) Save as [recommended path]
-   b) Save as [alternate path]
-   c) Enter a custom filename
-   d) Edit something first
-   e) Don't save — just display it
+   Next action:
+   a) Save as [target-usecase-persona path]
+   b) Don't save — just display it
 
    Saved file preview:
    # [chosen filename stem]
@@ -151,29 +138,13 @@ Determine whether the user wants to test a project feature or a skill:
    ## Expected Outcome
    [expected outcome]
    ```
-3. If the user picks **Enter a custom filename**, ask for a filename relative to `docs/agent-profiles/` and normalize it to a `.md` filename.
-   - Reject absolute paths, `..` segments, `~`, backslashes, and symlink escapes.
-   - Resolve the final path canonically before writing. It must stay within `docs/agent-profiles/` after normalization; otherwise refuse and ask again.
-   - If the user gives only a bare name, save it directly under `docs/agent-profiles/`.
-4. If the user picks **Edit something first**, ask:
-   ```
-   What do you want to edit?
-   a) Target
-   b) Use case
-   c) Expected outcome
-   d) Persona
-   e) Filename only
-   f) Cancel
-   ```
-   Return to the corresponding step after the edit. If the user picks **Filename only**, stay in Step 4 and re-present the filename options.
-5. If the chosen path already exists, ask:
+3. If the chosen path already exists, ask:
    ```
    That profile already exists.
    a) Overwrite it
-   b) Choose a different filename
-   c) Cancel save
+   b) Cancel save
    ```
-6. If saving, write the file using this format:
+4. If saving, write the file using this format:
    - Before writing, verify one more time that the resolved destination is inside `docs/agent-profiles/`.
    - Never overwrite files outside `docs/agent-profiles/`, even if the normalized filename appears valid.
 
@@ -207,7 +178,7 @@ Determine whether the user wants to test a project feature or a skill:
    [Realistic traits that add personality]
    ```
 
-7. After saving (or displaying), offer next steps via `AskUserQuestion`:
+5. After saving (or displaying), offer next steps via `AskUserQuestion`:
    ```
    Profile ready. What next?
    a) Create another profile

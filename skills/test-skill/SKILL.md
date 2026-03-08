@@ -9,7 +9,7 @@ A general-purpose skill testing framework. It executes any skill's SKILL.md by r
 
 **Architecture:** Main agent = AI executing the target skill. Subagent = simulated user with a persona, resumed at each decision point.
 
-**Input:** `/test-skill` starts the interactive profile selection. `/test-skill <profile-path>` loads a saved profile directly and skips Step 0 (e.g., `/test-skill docs/agent-profiles/survey-alex.md`).
+**Input:** `/test-skill` starts the interactive profile selection. `/test-skill <profile-path>` loads a saved profile directly and skips Step 0 (e.g., `/test-skill docs/agent-profiles/survey-quick-review-alex.md`).
 
 ---
 
@@ -20,20 +20,18 @@ A general-purpose skill testing framework. It executes any skill's SKILL.md by r
 **Otherwise:** Scan `docs/agent-profiles/` for saved profile files (`*.md`). Only offer profiles whose `## Target Type` is `skill`. If the field is missing, treat the file as legacy and only offer it when its `## Target` matches one of the discovered skills. Present via `AskUserQuestion`:
 
 ```
-Choose a test profile:
+Choose how to start:
 [If saved profiles exist:]
 a) [profile-name] — [skill]: [use case summary]
 [... additional profiles ...]
 
-b) Create a new profile (runs /create-profile)
-c) Random — auto-generate a persona and start immediately
+b) Temporary profile — continue without saving first
 ```
 
-If no saved profiles exist, omit option (a) and show only "Create new" and "Random."
+If no saved profiles exist, omit option (a) and show only "Temporary profile."
 
 - **Load saved:** Read the profile file. Extract Target Type, Target (skill name), Use Case, Expected Outcome, and Agent fields. The skill name determines the target skill for Step 1. Agent fields pre-populate Step 2.
-- **Create new:** Suggest the user run `/create-profile` first, then return to `/test-skill` with the saved profile.
-- **Random:** Auto-generate a skill selection, use case, expected outcome, and persona. Proceed immediately without saving.
+- **Temporary profile:** Continue in this skill without saving first. Resolve one skill, then auto-generate the use case, expected outcome, and persona for this run.
 
 ### Step 1 — Choose Target & Analyze
 
@@ -74,10 +72,16 @@ Present this structural analysis to the user, including any flagged issues. Exam
   - [issue] at [location]
 ```
 
-Ask the user via `AskUserQuestion`:
+Default behavior: after presenting the analysis, proceed directly to Step 2.
 
-> "Here's what I found. Ready to proceed, or want to adjust the test scope?"
-> - **(a)** Proceed — test the full skill flow
+Only stop for an extra `AskUserQuestion` if either:
+- the analysis found a blocking precondition or major structural ambiguity that needs a decision before testing, or
+- the user explicitly asks to narrow the scope.
+
+In those cases, ask:
+
+> "Here's what I found. How should we continue?"
+> - **(a)** Proceed — test the default flow
 > - **(b)** Focus on specific phases — choose which phases to test
 > - **(c)** Adjust preconditions — set up specific mock context before testing
 
@@ -85,11 +89,11 @@ Ask the user via `AskUserQuestion`:
 
 **If a profile was loaded in Step 0 with Agent details:** Pre-populate the persona from the profile fields (Background, Experience Level, Decision Tendencies, Quirks). Infer Motivation from the profile's Use Case. Present the pre-populated persona to the user for adjustment (see below).
 
-**If "Random" was selected in Step 0:** Run the full persona generation below as if no profile exists.
+**If a temporary profile was selected in Step 0:** Run the full persona generation below as if no profile exists.
 
 **If a profile was loaded but has no Agent details:** Auto-generate a persona based on the use case and skill analysis, then present for adjustment.
 
-**If Step 0 was skipped (no profile):** Analyze the skill to infer what kind of user it serves. Consider:
+**If no profile was loaded in Step 0:** Analyze the skill to infer what kind of user it serves. Consider:
 
 - What domain knowledge does the skill assume?
 - What motivations would bring someone to this skill?
@@ -266,11 +270,13 @@ Present the report path to the user and offer:
 
 > "Test complete. Report saved to `docs/test-reports/[file]`. What next?"
 > - **(a)** Review the report together — walk through findings
-> - **(b)** Run another test — same skill, different persona (skips Step 1 analysis — reuses the existing analysis)
+> - **(b)** Re-run this skill with a new persona
 > - **(c)** Test a different skill
 > - **(d)** Done
 
-**Re-run shortcut:** When the user selects **(b)**, skip Step 1 entirely — the skill analysis doesn't change. Go straight to Step 2 (persona generation) with the same target skill. If a profile was used, return to Step 0c to select a new profile; otherwise go to Step 2.
+If this run used a temporary profile, offer to save it before exiting using the standard `target-usecase-persona` filename.
+
+**Re-run shortcut:** When the user selects **(b)**, keep the same target skill and analysis context. Go straight to Step 2 to generate or choose a new persona, then run the test again. Do not send the user back through Step 0 or Step 1 unless they explicitly ask to change the target skill.
 
 ---
 
