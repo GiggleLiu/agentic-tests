@@ -35,57 +35,44 @@ Tests any software project's features from a downstream user's perspective. Auto
 
 ```bash
 git clone https://github.com/GiggleLiu/agentic-tests.git ~/.codex/agentic-tests
-mkdir -p ~/.agents/skills
-ln -s ~/.codex/agentic-tests/skills/agentic-tests ~/.agents/skills/agentic-tests
+mkdir -p .agents/skills
+for skill in ~/.codex/agentic-tests/skills/*/; do
+  ln -s "$skill" .agents/skills/"$(basename "$skill")"
+done
 ```
 
 ### OpenCode
 
 ```bash
 git clone https://github.com/GiggleLiu/agentic-tests.git ~/.config/opencode/agentic-tests
-mkdir -p ~/.config/opencode/skills
-ln -s ~/.config/opencode/agentic-tests/skills/agentic-tests ~/.config/opencode/skills/agentic-tests
+mkdir -p ~/.config/opencode/commands
+for skill in ~/.config/opencode/agentic-tests/skills/*/; do
+  name=$(basename "$skill")
+  ln -s "$skill/SKILL.md" ~/.config/opencode/commands/"$name".md
+done
 ```
 
 ## CI Integration
 
-Run agentic tests automatically on pull requests via the GitHub Action. Supports three runners: [OpenCode](https://github.com/opencode-ai/opencode), [Codex](https://github.com/openai/codex), and [Claude Code](https://claude.ai/code).
+Run agentic tests on demand by commenting `/agentic-tests` on any issue or PR. Supports three runners: [OpenCode](https://github.com/opencode-ai/opencode), [Codex](https://github.com/openai/codex), and [Claude Code](https://claude.ai/code).
 
 ### Quick Start
 
 Copy `examples/agentic-test.yml` to `.github/workflows/` in your repo, then add your API key as a repository secret (`Settings > Secrets > Actions`).
 
-```yaml
-# .github/workflows/agentic-test.yml
-name: Agentic Tests
-on:
-  pull_request:
+Trigger by commenting on any issue or PR:
+- `/agentic-tests` — test all configured features
+- `/agentic-tests feat1,feat2` — test specific features
 
-permissions:
-  pull-requests: write
-  contents: read
-
-jobs:
-  agentic-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: GiggleLiu/agentic-tests@main
-        with:
-          provider: anthropic
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+Only repo owners, members, and collaborators can trigger runs.
 
 ### How It Works
 
-1. **Installs the agent runner** (OpenCode, Codex, or Claude Code) and registers agentic-tests skills
-2. **Detects affected targets** — uses AI to infer which features or skills changed in the PR (from the diff + project docs like README.md, CLAUDE.md)
-3. **Runs tests** — dispatches `/test-feature` or `/test-skill` for each target, with matching agent profiles if available
-4. **Reports results** — posts a summary table as a PR comment; uploads full reports as workflow artifacts
+1. **Triggers on comment** — filters for `/agentic-tests` prefix, reacts with eyes emoji
+2. **Checks out the right code** — if commented on a PR, checks out the PR head; otherwise uses the default branch
+3. **Installs the agent runner** (OpenCode, Codex, or Claude Code) and registers agentic-tests skills
+4. **Runs tests** — dispatches `/test-feature` or `/test-skill` for each listed feature, with matching agent profiles if available
+5. **Reports results** — posts a summary as a comment on the triggering issue/PR; uploads full reports as workflow artifacts
 
 ### Inputs
 
@@ -95,9 +82,9 @@ jobs:
 | `provider` | (required) | LLM provider: `anthropic`, `openai`, `moonshot`, etc. |
 | `mode` | `feature` | `feature` (test project features), `skill` (test skill flows), or `both` |
 | `model` | runner default | Model to use (e.g., `claude-sonnet-4-6`, `gpt-5.4`) |
-| `features` | `auto` | `auto` = AI-detect from diff, or comma-separated explicit list |
+| `features` | (required) | Comma-separated list of features/skills to test |
 | `profiles-dir` | `docs/agent-profiles` | Directory containing saved agent profiles |
-| `base-branch` | `origin/main` | Base branch for diff comparison |
+| `issue-number` | | Issue or PR number to post results to |
 | `extra-prompt` | | Extra instructions appended to each test (e.g., `test as a beginner`) |
 
 ### Modes
@@ -147,16 +134,10 @@ with:
   runner: codex
   provider: openai
   model: gpt-5.4
+  features: 'authentication,REST API'
 env:
-  CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-Explicit feature list (skip AI detection):
-```yaml
-with:
-  provider: anthropic
-  features: 'authentication,REST API,CLI commands'
 ```
 
 ## Reports

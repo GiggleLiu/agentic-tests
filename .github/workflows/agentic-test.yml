@@ -20,13 +20,22 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
-       startsWith(github.event.comment.body, '/agentic-tests'))
+       startsWith(github.event.comment.body, '/agentic-tests') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Checkout PR head (if comment is on a PR)
+        if: github.event_name == 'issue_comment' && github.event.issue.pull_request
+        run: |
+          PR_HEAD=$(gh pr view ${{ github.event.issue.number }} --json headRefName -q .headRefName)
+          git checkout "$PR_HEAD"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: React to comment
         if: github.event_name == 'issue_comment'
