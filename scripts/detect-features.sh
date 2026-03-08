@@ -27,9 +27,15 @@ if [ "$FEATURES_INPUT" != "auto" ]; then
   exit 0
 fi
 
-# Gather context for OpenCode
-DIFF=$(git diff "$BASE_BRANCH"...HEAD --stat --unified=3 2>/dev/null || git diff HEAD~1 --stat --unified=3)
-DIFF_FILES=$(git diff "$BASE_BRANCH"...HEAD --name-only 2>/dev/null || git diff HEAD~1 --name-only)
+# Gather context — use base branch diff, fall back to last commit if empty/unavailable
+DIFF=$(git diff "$BASE_BRANCH"...HEAD --stat --unified=3 2>/dev/null)
+DIFF_FILES=$(git diff "$BASE_BRANCH"...HEAD --name-only 2>/dev/null)
+
+# If diff is empty (e.g., workflow_dispatch on main), fall back to last commit
+if [ -z "$DIFF_FILES" ]; then
+  DIFF=$(git diff HEAD~1 --stat --unified=3 2>/dev/null || true)
+  DIFF_FILES=$(git diff HEAD~1 --name-only 2>/dev/null || true)
+fi
 
 # Collect project docs (truncate to keep prompt small)
 PROJECT_DOCS=""
