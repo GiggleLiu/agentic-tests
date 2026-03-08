@@ -28,6 +28,7 @@ jobs:
       - name: Run agentic tests
         uses: GiggleLiu/agentic-tests@main
         with:
+          runner: codex
           provider: openai
           mode: skill
         env:
