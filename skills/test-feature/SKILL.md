@@ -9,7 +9,7 @@ Simulates downstream users who want to use a software project's features. Each s
 
 Works with any software project type: libraries, CLI tools, web services, plugins, frameworks, etc.
 
-**Input:** `/test-feature` starts the interactive profile selection. `/test-feature <profile-path>` loads a saved profile directly and skips Step 0 (e.g., `/test-feature docs/agent-profiles/authentication-login-smoke-alex.md`). `/test-feature <feature-name>` (non-path argument) tests the named feature with an auto-generated ephemeral profile. If none is specified, discover features from project docs and test all.
+**Input:** `/test-feature` starts the interactive profile selection. `/test-feature <profile-path>` loads a saved profile directly and skips Step 0 (e.g., `/test-feature docs/agent-profiles/authentication-login-smoke-alex.md`). `/test-feature <feature-name>` (non-path argument) tests the named feature using the ephemeral flow. If none is specified, discover features from project docs and test all.
 
 ---
 
@@ -17,7 +17,7 @@ Works with any software project type: libraries, CLI tools, web services, plugin
 
 **If the argument is a file path (contains `/` or ends in `.md`):** Read the profile file directly only if its canonical path resolves inside `docs/agent-profiles/`. Reject absolute paths, `..` traversal, home-directory references, and symlink escapes outside that directory. Require `## Target Type` to be `feature` when present. Extract Target (feature name), Use Case, Expected Outcome, and Agent fields. Skip the selection UI below and proceed to Step 1.
 
-**If the argument is a feature name (not a path):** Use it as the feature to test, skip Step 0, and proceed to Step 1 with an auto-generated ephemeral profile.
+**If the argument is a feature name (not a path):** Use it as the feature to test, skip Step 0, and proceed to Step 1 using the ephemeral flow.
 
 **Otherwise:** Scan `docs/agent-profiles/` for saved profile files (`*.md`). Only offer profiles whose `## Target Type` is `feature`. If the field is missing, treat the file as legacy and only offer it when its `## Target` does not name one of the discovered skills in this repo.
 
@@ -30,12 +30,12 @@ a) [profile-name] — [feature]: [use case summary]
 [... additional profiles ...]
 ```
 
-If the user does not choose one of the listed saved profiles, continue without a saved profile and internally auto-generate an ephemeral use case, expected outcome, and persona for this run.
+If the user does not choose one of the listed saved profiles, continue without a saved profile and use the ephemeral flow for this run.
 
-If no saved profiles exist, skip this selection UI and continue immediately with an internally generated ephemeral profile.
+If no saved profiles exist, skip this selection UI and continue immediately using the ephemeral flow.
 
 - **Load saved:** Read the profile file. Extract Target Type, Target (feature name), Use Case, Expected Outcome, and Agent fields. These carry forward into subsequent steps.
-- **Ephemeral fallback:** Continue in this skill without saving first. Internally auto-generate the use case, expected outcome, and persona as an ephemeral profile for this run, then proceed without asking for confirmation.
+- **Ephemeral fallback:** Continue in this skill without saving first. After Step 1 resolves the feature scope, discuss the use case with the user, record the expected outcome, then derive a lightweight persona and continue.
 
 ### Step 1 — Discover Project & Features
 
@@ -70,6 +70,25 @@ Keep this explanation focused on the blocking issue. Do not dump the full discov
 
 ### Step 2 — Test Each Feature
 
+If no saved profile was loaded, first define the ephemeral use case for this run:
+
+1. Based on the selected feature or feature set, propose 3 concrete use case options. For each option, include a suggested expected outcome.
+   - If only one feature is being tested, make the options specific to that feature.
+   - If multiple features are being tested, make the options describe the overall testing intent across the run.
+2. Present them via `AskUserQuestion`:
+   ```
+   Here are some ways we could test this run:
+   a) [Use case 1] — Expected: [outcome]
+   b) [Use case 2] — Expected: [outcome]
+   c) [Use case 3] — Expected: [outcome]
+   d) Describe your own use case
+
+   Which use case?
+   ```
+3. If the user picks **Describe your own use case**, ask them to describe the use case and expected outcome.
+4. Record the chosen use case and expected outcome for this run.
+5. If no saved profile was loaded, infer a lightweight persona from the chosen use case, selected feature scope, and project type. The use case is the main driver of the test; persona only shapes how the simulated user behaves.
+
 For each feature, dispatch a **subagent** (see [Cross-Platform Subagent Guide](#cross-platform-subagent-guide) below). Give the subagent:
 
 Before dispatching any subagent, establish these safety rules:
@@ -79,9 +98,9 @@ Before dispatching any subagent, establish these safety rules:
 - If the documented flow requires network access, external accounts, secrets, writes outside the workspace/temp area, or system-level installation, stop that branch and report it as a blocked precondition instead of improvising.
 - Prefer inspection-first behavior: read a command, reason about its effect, then decide whether it is safe enough to run inside the current sandbox.
 
-- **Role:** From the profile's Agent section (background, experience level, decision tendencies, quirks). If no profile was selected, infer a lightweight user description relevant to the feature and project type.
-- **Use case:** From the profile's Use Case field. If no profile, infer from the feature's purpose.
-- **Expected outcome:** From the profile's Expected Outcome field. If no profile, omit.
+- **Role:** From the profile's Agent section (background, experience level, decision tendencies, quirks). If no saved profile was loaded, infer a lightweight user description from the chosen ephemeral use case and project type.
+- **Use case:** From the profile's Use Case field. If no saved profile was loaded, use the selected ephemeral use case.
+- **Expected outcome:** From the profile's Expected Outcome field. If no saved profile was loaded, use the selected ephemeral expected outcome.
 - **Docs:** The README and relevant doc excerpts for this feature.
 - **Instructions:**
 

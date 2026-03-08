@@ -28,12 +28,12 @@ a) [profile-name] — [skill]: [use case summary]
 [... additional profiles ...]
 ```
 
-If the user does not choose one of the listed saved profiles, continue without a saved profile and internally auto-generate an ephemeral use case and expected outcome for this run. Step 2 will derive the persona from that use case.
+If the user does not choose one of the listed saved profiles, continue without a saved profile and use the ephemeral flow for this run. Step 2 will discuss the use case with the user, record the expected outcome, and then derive the persona.
 
-If no saved profiles exist, skip this selection UI and continue immediately with an internally generated ephemeral profile.
+If no saved profiles exist, skip this selection UI and continue immediately using the ephemeral flow.
 
 - **Load saved:** Read the profile file. Extract Target Type, Target (skill name), Use Case, Expected Outcome, and Agent fields. The skill name determines the target skill for Step 1. Agent fields pre-populate Step 2.
-- **Ephemeral fallback:** Continue in this skill without saving first. Resolve one skill, then internally auto-generate the use case and expected outcome for this run. Step 2 derives the persona from that use case and proceeds without asking for confirmation.
+- **Ephemeral fallback:** Continue in this skill without saving first. Resolve one skill, then discuss the use case with the user, record the expected outcome, and let Step 2 derive the persona from that use case.
 
 ### Step 1 — Choose Target & Analyze
 
@@ -80,15 +80,24 @@ Keep this explanation focused on the blocking issue. Do not dump the full struct
 
 **If a profile was loaded in Step 0 with Agent details:** Pre-populate the persona from the profile fields (Background, Experience Level, Decision Tendencies, Quirks). Infer Motivation from the profile's Use Case.
 
-**If the ephemeral fallback was used in Step 0:** Run the full persona generation below using the generated use case and expected outcome.
+**If the ephemeral fallback was used in Step 0:** First define the use case with the user, then derive the persona from that use case.
+
+For ephemeral runs, discuss the use case before generating the persona:
+1. Based on the resolved skill and its analysis, propose 3 concrete use case options. For each option, include a suggested expected outcome.
+2. Present them via `AskUserQuestion`:
+   ```
+   Here are some ways we could test "[skill]":
+   a) [Use case 1] — Expected: [outcome]
+   b) [Use case 2] — Expected: [outcome]
+   c) [Use case 3] — Expected: [outcome]
+   d) Describe your own use case
+
+   Which use case?
+   ```
+3. If the user picks **Describe your own use case**, ask them to describe the use case and expected outcome.
+4. Record the chosen use case and expected outcome.
 
 **If a profile was loaded but has no Agent details:** Auto-generate a persona based on the use case and skill analysis.
-
-**If no profile was loaded in Step 0:** Analyze the skill to infer what kind of user it serves. Consider:
-
-- What domain knowledge does the skill assume?
-- What motivations would bring someone to this skill?
-- What range of experience levels does it handle?
 
 Generate a persona with:
 
