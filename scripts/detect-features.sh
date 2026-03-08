@@ -105,21 +105,34 @@ if [ "$EXIT_CODE" -ne 0 ]; then
 fi
 
 # Extract JSON array from response (runner may add extra text)
-JSON=$(echo "$RESPONSE" | grep -o '\[.*\]' | head -1)
-if [ -z "$JSON" ]; then
-  echo "::warning::Could not parse response from ${RUNNER}. No targets detected."
+# Use python for robust extraction — grep '\[.*\]' can match non-JSON brackets
+PARSE_OK=true
+echo "$RESPONSE" | python3 -c "
+import sys, json, re
+
+text = sys.stdin.read()
+# Find all bracket-delimited segments and try parsing each as JSON
+for match in re.finditer(r'\[.*?\]', text, re.DOTALL):
+    try:
+        items = json.loads(match.group())
+        if isinstance(items, list):
+            for item in items:
+                print(item)
+            sys.exit(0)
+    except (json.JSONDecodeError, TypeError):
+        continue
+
+# No valid JSON array found
+sys.exit(1)
+" > "$OUTPUT_FILE" 2>/dev/null || PARSE_OK=false
+
+if [ "$PARSE_OK" = false ] || [ ! -s "$OUTPUT_FILE" ]; then
+  echo "::warning::Could not parse JSON response from ${RUNNER}. No targets detected."
+  echo "::warning::Raw response: ${RESPONSE}"
   echo -n > "$OUTPUT_FILE"
   echo "::endgroup::"
   exit 0
 fi
-
-# Parse JSON array to one-per-line
-echo "$JSON" | python3 -c "
-import sys, json
-items = json.load(sys.stdin)
-for item in items:
-    print(item)
-" > "$OUTPUT_FILE"
 
 COUNT=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
 echo "Detected $COUNT affected target(s):"
