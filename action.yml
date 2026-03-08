@@ -9,8 +9,12 @@ inputs:
     description: 'Model to use'
     required: false
     default: ''
+  mode:
+    description: 'Test mode: "feature" (test project features), "skill" (test skill flows), or "both"'
+    required: false
+    default: 'feature'
   features:
-    description: '"auto" to AI-detect from diff, or comma-separated feature list'
+    description: '"auto" to AI-detect from diff, or comma-separated feature/skill list'
     required: false
     default: 'auto'
   profiles-dir:
@@ -69,6 +73,7 @@ runs:
       run: ${{ github.action_path }}/scripts/detect-features.sh
       shell: bash
       env:
+        INPUT_MODE: ${{ inputs.mode }}
         INPUT_FEATURES: ${{ inputs.features }}
         INPUT_BASE_BRANCH: ${{ inputs.base-branch }}
 
@@ -77,6 +82,7 @@ runs:
       run: ${{ github.action_path }}/scripts/run-tests.sh
       shell: bash
       env:
+        INPUT_MODE: ${{ inputs.mode }}
         INPUT_PROFILES_DIR: ${{ inputs.profiles-dir }}
         INPUT_EXTRA_PROMPT: ${{ inputs.extra-prompt }}
 

@@ -1,23 +1,25 @@
 #!/bin/bash
-# Detect which features are affected by the current PR diff.
-# Usage: ./detect-features.sh <features-input> <base-branch>
+# Detect which features or skills are affected by the current PR diff.
 #
-# If features-input is "auto", uses OpenCode to infer from diff + project docs.
-# Otherwise, treats it as a comma-separated list of feature names.
+# Env vars (from action.yml):
+#   INPUT_MODE       — "feature", "skill", or "both"
+#   INPUT_FEATURES   — "auto" or comma-separated list
+#   INPUT_BASE_BRANCH — base branch for diff (default: origin/main)
 #
-# Output: writes one feature per line to /tmp/affected-features.txt
+# Output: writes one item per line to /tmp/affected-features.txt
 set -euo pipefail
 
+MODE="${INPUT_MODE:-feature}"
 FEATURES_INPUT="${INPUT_FEATURES:-${1:-auto}}"
 BASE_BRANCH="${INPUT_BASE_BRANCH:-${2:-origin/main}}"
 OUTPUT_FILE="/tmp/affected-features.txt"
 
-echo "::group::Detecting affected features"
+echo "::group::Detecting affected targets (mode: ${MODE})"
 
 if [ "$FEATURES_INPUT" != "auto" ]; then
   # Explicit list: split on commas, trim whitespace
   echo "$FEATURES_INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' > "$OUTPUT_FILE"
-  echo "Using explicit feature list:"
+  echo "Using explicit list:"
   cat "$OUTPUT_FILE"
   echo "::endgroup::"
   exit 0
@@ -39,11 +41,23 @@ $(head -200 "$doc")
 done
 
 if [ -z "$PROJECT_DOCS" ]; then
-  PROJECT_DOCS="No project documentation found. Infer features from file structure."
+  PROJECT_DOCS="No project documentation found. Infer from file structure."
 fi
 
-# Build prompt
-PROMPT="You are analyzing a pull request to determine which user-facing features are affected.
+# Build mode-specific prompt
+case "$MODE" in
+  feature)
+    TARGET_DESC="user-facing features (capabilities exposed to downstream users, e.g., 'authentication', 'REST API', 'CLI commands')"
+    ;;
+  skill)
+    TARGET_DESC="skills (SKILL.md-based interaction protocols, e.g., 'test-skill', 'create-profile'). Look for SKILL.md files in the diff and skill directories."
+    ;;
+  both)
+    TARGET_DESC="both user-facing features AND skills (SKILL.md-based interaction protocols). Label each as 'feature:name' or 'skill:name'."
+    ;;
+esac
+
+PROMPT="You are analyzing a pull request to determine which ${TARGET_DESC} are affected.
 
 Here are the changed files:
 ${DIFF_FILES}
@@ -54,12 +68,11 @@ ${DIFF}
 Here are the project docs:
 ${PROJECT_DOCS}
 
-Based on the changed files and project documentation, identify which user-facing features are affected by this PR.
-A 'feature' is a capability exposed to downstream users (e.g., 'authentication', 'REST API', 'CLI commands', 'plugin system').
+Based on the changed files and project documentation, identify which ${TARGET_DESC} are affected by this PR.
 
-Return ONLY a JSON array of feature name strings. No explanation, no markdown, just the JSON array.
+Return ONLY a JSON array of name strings. No explanation, no markdown, just the JSON array.
 Example: [\"authentication\", \"REST API\"]
-If no user-facing features are affected, return: []"
+If nothing is affected, return: []"
 
 # Call OpenCode
 RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
@@ -67,21 +80,21 @@ RESPONSE=$(opencode -p "$PROMPT" -q -f text 2>/dev/null || echo "[]")
 # Extract JSON array from response (OpenCode may add extra text)
 JSON=$(echo "$RESPONSE" | grep -o '\[.*\]' | head -1)
 if [ -z "$JSON" ]; then
-  echo "::warning::Could not parse feature list from OpenCode response. No features detected."
+  echo "::warning::Could not parse response from OpenCode. No targets detected."
   echo -n > "$OUTPUT_FILE"
   echo "::endgroup::"
   exit 0
 fi
 
-# Parse JSON array to one-per-line (using python for reliability)
+# Parse JSON array to one-per-line
 echo "$JSON" | python3 -c "
 import sys, json
-features = json.load(sys.stdin)
-for f in features:
-    print(f)
+items = json.load(sys.stdin)
+for item in items:
+    print(item)
 " > "$OUTPUT_FILE"
 
-FEATURE_COUNT=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
-echo "Detected $FEATURE_COUNT affected feature(s):"
+COUNT=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
+echo "Detected $COUNT affected target(s):"
 cat "$OUTPUT_FILE"
 echo "::endgroup::"

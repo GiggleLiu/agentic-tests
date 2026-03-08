@@ -38,6 +38,7 @@ jobs:
         uses: GiggleLiu/agentic-tests@v1
         with:
           provider: anthropic
+          # mode: feature               # "feature", "skill", or "both"
           # model: claude-sonnet-4-20250514
           # features: auto
           # extra-prompt: 'focus on error handling and edge cases'

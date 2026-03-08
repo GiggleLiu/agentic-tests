@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# run-tests.sh — Run agentic tests for each detected feature.
+# run-tests.sh — Run agentic tests for each detected feature or skill.
 #
-# Arguments:
-#   $1  profiles directory (default: "docs/agent-profiles")
+# Env vars (from action.yml):
+#   INPUT_MODE         — "feature", "skill", or "both"
+#   INPUT_PROFILES_DIR — profiles directory (default: docs/agent-profiles)
+#   INPUT_EXTRA_PROMPT — extra instructions appended to each prompt
 #
 # Input:
-#   /tmp/affected-features.txt — one feature name per line (written by detect-features.sh)
+#   /tmp/affected-features.txt — one target per line (written by detect-features.sh)
 #
 # Output:
-#   Test reports written to docs/test-reports/ by the test-feature skill.
+#   Test reports written to docs/test-reports/.
 #   Sets GitHub Actions outputs via $GITHUB_OUTPUT.
 
+MODE="${INPUT_MODE:-feature}"
 PROFILES_DIR="${INPUT_PROFILES_DIR:-${1:-docs/agent-profiles}}"
 EXTRA_PROMPT="${INPUT_EXTRA_PROMPT:-}"
 FEATURES_FILE="/tmp/affected-features.txt"
@@ -55,13 +58,30 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
     PROFILE_PATH=$(find "${PROFILES_DIR}" -maxdepth 1 -name "${slug}-*.md" -type f | head -1) || true
   fi
 
+  # ── Determine test command based on mode ─────────────────────────────────
+  # In "both" mode, items may be prefixed with "feature:" or "skill:"
+  TEST_CMD="/test-feature"
+  TARGET="${feature}"
+  if [[ "${MODE}" == "skill" ]]; then
+    TEST_CMD="/test-skill"
+  elif [[ "${MODE}" == "both" ]]; then
+    if [[ "${feature}" == skill:* ]]; then
+      TEST_CMD="/test-skill"
+      TARGET="${feature#skill:}"
+      slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+    elif [[ "${feature}" == feature:* ]]; then
+      TARGET="${feature#feature:}"
+      slug=$(echo "${TARGET}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+    fi
+  fi
+
   # ── Build the prompt ─────────────────────────────────────────────────────
   if [[ -n "${PROFILE_PATH}" ]]; then
     echo "Using profile: ${PROFILE_PATH}"
-    PROMPT="/test-feature ${PROFILE_PATH}"
+    PROMPT="${TEST_CMD} ${PROFILE_PATH}"
   else
-    echo "No profile found for '${slug}' — running with feature name"
-    PROMPT="/test-feature ${feature}"
+    echo "No profile found for '${slug}' — running with ${TEST_CMD}"
+    PROMPT="${TEST_CMD} ${TARGET}"
   fi
 
   # Append extra instructions if provided

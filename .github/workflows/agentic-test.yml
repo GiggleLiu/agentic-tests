@@ -1,0 +1,32 @@
+# Agentic Tests — dogfood: test this plugin's own skills with simulated users
+#
+# Requires: ANTHROPIC_API_KEY secret (Settings > Secrets > Actions)
+
+name: Agentic Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  agentic-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run agentic tests
+        uses: GiggleLiu/agentic-tests@main
+        with:
+          provider: anthropic
+          mode: skill
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
