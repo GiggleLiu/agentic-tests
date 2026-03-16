@@ -43,7 +43,7 @@ Both skills output reports to `docs/test-reports/`:
 
 ## Installation
 
-- **Claude Code:** `/plugin marketplace add GiggleLiu/agentic-tests`
+- **Claude Code:** `/plugin marketplace add GiggleLiu/agentic-tests`, or manually: clone to `~/.claude/agentic-tests` and symlink each `skills/*/SKILL.md` into `~/.claude/commands/agentic-tests:<skill>.md`
 - **Codex:** Clone → symlink each directory under `skills/*/` into `~/.agents/skills/`
 - **OpenCode:** Clone → symlink each `skills/*/SKILL.md` into `~/.config/opencode/commands/<skill>.md`
 

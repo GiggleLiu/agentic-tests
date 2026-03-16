@@ -22,13 +22,32 @@ Tests any software project's features from a downstream user's perspective. Auto
 /test-feature "CLI commands" "config system"
 ```
 
+### create-profile
+
+Creates and manages reusable agent profiles. Guides you through selecting a feature or skill, defining a use case with expected outcome, and choosing or generating an agent persona. Saved profiles are reused by `test-skill` and `test-feature`.
+
+```
+/create-profile
+```
+
 ## Installation
 
 ### Claude Code
 
+Via plugin marketplace:
 ```
 /plugin marketplace add GiggleLiu/agentic-tests
 /plugin install agentic-tests@agentic-tests
+```
+
+Or manually (symlinks all skills into `~/.claude/commands/`):
+```bash
+git clone https://github.com/GiggleLiu/agentic-tests.git ~/.claude/agentic-tests
+mkdir -p ~/.claude/commands
+for skill in ~/.claude/agentic-tests/skills/*/; do
+  name=$(basename "$skill")
+  ln -sf "$skill/SKILL.md" ~/.claude/commands/"agentic-tests:$name.md"
+done
 ```
 
 ### Codex
