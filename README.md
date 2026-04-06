@@ -73,101 +73,203 @@ done
 
 ## CI Integration
 
-Run agentic tests on demand by commenting `/agentic-tests` on any issue or PR. Supports three runners: [OpenCode](https://github.com/opencode-ai/opencode), [Codex](https://github.com/openai/codex), and [Claude Code](https://claude.ai/code).
+Let AI agents test your project on every PR — just like human reviewers, but they actually run the code.
 
-### Quick Start
+Comment `/agentic-tests` on any issue or PR, and an AI agent will:
 
-Copy `examples/agentic-test.yml` to `.github/workflows/` in your repo, then add your API key as a repository secret (`Settings > Secrets > Actions`).
+1. Read your docs and figure out how to set up the project
+2. Exercise the features you specify, as a real user would
+3. Post a pass/fail summary right back on the issue or PR
 
-Trigger by commenting on any issue or PR:
-- `/agentic-tests` — test all configured features
-- `/agentic-tests feat1,feat2` — test specific features
+Works with three agent runners: [Claude Code](https://claude.ai/code), [Codex](https://github.com/openai/codex), and [OpenCode](https://github.com/opencode-ai/opencode).
+
+### Setup (2 minutes)
+
+**Step 1.** Copy the example workflow into your repo:
+
+```bash
+mkdir -p .github/workflows
+curl -o .github/workflows/agentic-test.yml \
+  https://raw.githubusercontent.com/GiggleLiu/agentic-tests/main/examples/agentic-test.yml
+```
+
+**Step 2.** Add your API key as a repository secret:
+
+> Settings → Secrets and variables → Actions → New repository secret
+
+| Runner | Secret name | Value |
+|--------|-------------|-------|
+| Claude Code | `ANTHROPIC_API_KEY` | `sk-ant-...` |
+| Codex | `OPENAI_API_KEY` | `sk-...` |
+| OpenCode | depends on provider | e.g., `OPENAI_API_KEY` |
+
+**Step 3.** Edit the workflow to list your features:
+
+```yaml
+env:
+  DEFAULT_FEATURES: 'auth,api,cli'   # ← your features here
+```
+
+That's it. Now comment `/agentic-tests` on any issue or PR to run.
+
+### Usage
+
+```
+/agentic-tests              # test all default features
+/agentic-tests auth,api     # test specific features
+```
 
 Only repo owners, members, and collaborators can trigger runs.
 
-### How It Works
+### What happens behind the scenes
 
-1. **Triggers on comment** — filters for `/agentic-tests` prefix, reacts with eyes emoji
-2. **Checks out the right code** — if commented on a PR, resolves the PR head repo and SHA before checkout; otherwise uses the default branch
-3. **Installs the agent runner** (OpenCode, Codex, or Claude Code) and registers agentic-tests skills
-4. **Runs tests** — dispatches `/test-feature` or `/test-skill` for each listed feature, with matching agent profiles if available
-5. **Reports results** — posts a summary as a comment on the triggering issue/PR; uploads full reports as workflow artifacts
-
-### Inputs
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `runner` | `opencode` | Agent runner: `opencode`, `codex`, or `claude-code` |
-| `provider` | (required) | LLM provider: `anthropic`, `openai`, `moonshot`, etc. |
-| `mode` | `feature` | `feature` (test project features), `skill` (test skill flows), or `both` |
-| `model` | runner default | Model to use (e.g., `claude-sonnet-4-6`, `gpt-5.4`) |
-| `features` | (required) | Comma-separated list of features/skills to test |
-| `profiles-dir` | `docs/agent-profiles` | Directory containing saved agent profiles |
-| `issue-number` | | Issue or PR number to post results to |
-| `extra-prompt` | | Extra instructions appended to each test (e.g., `test as a beginner`) |
-
-### Modes
-
-- **`feature`** — tests project features via `/test-feature`. Simulated users read docs, install, and exercise code. Best for libraries, CLIs, web services.
-- **`skill`** — tests skill flows via `/test-skill`. Role-plays through each SKILL.md with a simulated user persona. Best for skill/plugin repos.
-- **`both`** — runs both. Detection returns items prefixed `feature:name` or `skill:name`.
-
-### Agent Profiles
-
-Saved profiles live in `docs/agent-profiles/`. The current profile schema includes:
-
-- `## Target Type` — `feature` or `skill`
-- `## Target` — the concrete feature or skill name
-- `## Use Case`
-- `## Expected Outcome`
-- `## Agent`
-
-### Examples
-
-Test a library's features:
-```yaml
-with:
-  provider: anthropic
-  mode: feature
+```
+Comment "/agentic-tests"
+    │
+    ▼
+┌─ GitHub Action ────────────────────────────┐
+│  1. Install agent runner (Claude/Codex/OC) │
+│  2. Configure model & API keys             │
+│  3. Register agentic-tests skills          │
+│  4. For each feature:                      │
+│     → spawn a simulated user agent         │
+│     → read docs, install, exercise feature │
+│     → write test report                    │
+│  5. Post summary comment on issue/PR       │
+│  6. Upload full reports as artifacts       │
+└────────────────────────────────────────────┘
 ```
 
-Test a skill repo's conversational flows:
-```yaml
-with:
-  provider: anthropic
-  mode: skill
-```
+### Choosing a runner
 
-Test with custom instructions:
 ```yaml
-with:
-  provider: openai
-  model: gpt-4o
-  extra-prompt: 'focus on error handling and edge cases'
-```
-
-Use Claude Code as the runner:
-```yaml
+# Claude Code (default: claude-opus-4-6)
 with:
   runner: claude-code
   provider: anthropic
-  model: claude-opus-4-6
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
 
-Use Codex as the runner:
-```yaml
+# Codex (default: gpt-5.4)
 with:
   runner: codex
   provider: openai
-  model: gpt-5.4
-  features: 'authentication,REST API'
 env:
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# OpenCode (default runner)
+with:
+  runner: opencode
+  provider: moonshot
 ```
+
+### All inputs
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `runner` | `opencode` | `opencode`, `codex`, or `claude-code` |
+| `provider` | *(required)* | `anthropic`, `openai`, `moonshot`, etc. |
+| `features` | *(required)* | Comma-separated features to test |
+| `mode` | `feature` | `feature`, `skill`, or `both` |
+| `model` | runner default | Override model (e.g., `claude-sonnet-4-6`) |
+| `skills` | built-in skills | Skills to install (see [Custom skills](#custom-skills)) |
+| `profiles-dir` | `docs/agent-profiles` | Directory with saved agent profiles |
+| `skill-repos` | | GitHub repos with skills to clone (e.g., `owner/repo`) |
+| `extra-prompt` | | Extra instructions (e.g., `test as a beginner`) |
+| `issue-number` | | Issue/PR number to post results to |
+
+### Custom skills
+
+By default, the action installs the three built-in skills (`test-skill`, `test-feature`, `create-profile`). You can add your own skills or replace the defaults using the `skills` input.
+
+Each entry is either a **bare name** (built-in skill) or a **path** (directory containing `SKILL.md`):
+
+```yaml
+# Built-in + a custom skill from your repo
+with:
+  skills: 'test-skill,test-feature,./my-skills/lint-checker'
+
+# Only your custom skills — no built-ins
+with:
+  skills: './skills/security-audit,./skills/perf-test'
+```
+
+To use skills from another GitHub repo, use `skill-repos` — the AI agent clones the repo, reads the README, and installs the skills itself:
+
+```yaml
+- uses: GiggleLiu/agentic-tests@v1
+  with:
+    skill-repos: 'owner/skill-repo,owner/another-repo'
+```
+
+This works with any repo structure — the agent figures out how to install the skills by reading the repo's documentation. No need to know the internal layout.
+
+For more control, you can also check out repos manually and reference paths directly:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    repository: owner/skill-repo
+    path: .skill-repo
+
+- uses: GiggleLiu/agentic-tests@v1
+  with:
+    skills: 'test-skill,.skill-repo/skills/brainstorming'
+```
+
+A skill directory just needs a `SKILL.md` file:
+
+```
+my-skills/
+  lint-checker/
+    SKILL.md       ← skill definition (YAML frontmatter + instructions)
+```
+
+### Setup runner only
+
+If you just need a configured agent runner without running tests (e.g., for your own workflows):
+
+```yaml
+- uses: GiggleLiu/agentic-tests/setup-runner@v1
+  with:
+    runner: claude-code
+    provider: anthropic
+    skills: 'test-skill,test-feature'
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Now use the runner for your own purposes
+- run: claude -p "your prompt here"
+```
+
+### Testing modes
+
+- **`feature`** — simulated users read your docs, install, and exercise code. Best for libraries, CLIs, and web services.
+- **`skill`** — role-plays through each SKILL.md with a simulated user persona. Best for skill/plugin repos.
+- **`both`** — runs both. Prefix items with `feature:` or `skill:` to control which mode each gets.
+
+### Agent profiles
+
+Want more control over how the AI tests your features? Create agent profiles in `docs/agent-profiles/`:
+
+```markdown
+## Target Type
+feature
+
+## Target
+authentication
+
+## Use Case
+Sign up, log in, reset password as a new user
+
+## Expected Outcome
+All auth flows complete without errors
+
+## Agent
+A junior developer unfamiliar with the codebase
+```
+
+The CI automatically picks up matching profiles and uses them to guide the test persona.
 
 ## Reports
 

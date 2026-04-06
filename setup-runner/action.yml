@@ -1,0 +1,58 @@
+name: 'Setup Agent Runner'
+description: 'Install and configure an AI agent runner (OpenCode, Codex, or Claude Code) with skills'
+
+inputs:
+  runner:
+    description: 'Agent runner: "opencode", "codex", or "claude-code"'
+    required: false
+    default: 'opencode'
+  provider:
+    description: 'LLM provider — anthropic, openai, moonshot, etc.'
+    required: true
+  model:
+    description: 'Model to use'
+    required: false
+    default: ''
+  skills:
+    description: 'Skills to install (comma-separated). Bare names resolve to built-in skills; paths resolve to local directories containing SKILL.md'
+    required: false
+    default: 'test-skill,test-feature,create-profile'
+  skill-repos:
+    description: 'Comma-separated GitHub repos containing skills to clone (e.g., "owner/repo"). The AI agent reads each repo README to install skills.'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install agent runner
+      run: |
+        case "${{ inputs.runner }}" in
+          codex)       ${{ github.action_path }}/../scripts/install-codex.sh ;;
+          claude-code) ${{ github.action_path }}/../scripts/install-claude-code.sh ;;
+          *)           ${{ github.action_path }}/../scripts/install-opencode.sh ;;
+        esac
+      shell: bash
+
+    - name: Configure agent runner
+      run: ${{ github.action_path }}/../scripts/configure-runner.sh
+      shell: bash
+      env:
+        INPUT_RUNNER: ${{ inputs.runner }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_PROVIDER: ${{ inputs.provider }}
+
+    - name: Install skills
+      run: ${{ github.action_path }}/../scripts/install-skills.sh
+      shell: bash
+      env:
+        INPUT_RUNNER: ${{ inputs.runner }}
+        INPUT_SKILLS: ${{ inputs.skills }}
+        ACTION_SKILLS_DIR: ${{ github.action_path }}/../skills
+
+    - name: Clone skill repos
+      if: inputs.skill-repos != ''
+      run: ${{ github.action_path }}/../scripts/clone-skill-repos.sh
+      shell: bash
+      env:
+        INPUT_SKILL_REPOS: ${{ inputs.skill-repos }}

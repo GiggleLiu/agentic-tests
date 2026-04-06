@@ -20,6 +20,7 @@ RUNNER="${INPUT_RUNNER:-opencode}"
 MODE="${INPUT_MODE:-feature}"
 PROFILES_DIR="${INPUT_PROFILES_DIR:-${1:-docs/agent-profiles}}"
 EXTRA_PROMPT="${INPUT_EXTRA_PROMPT:-}"
+SKILL_REPOS_DIR="${SKILL_REPOS_DIR:-.agentic-skills}"
 FEATURES_FILE="/tmp/affected-features.txt"
 REPORTS_DIR="docs/test-reports"
 
@@ -111,6 +112,21 @@ if [[ ! -s "${FEATURES_FILE}" ]]; then
   exit 0
 fi
 
+# ── Build skill-repos prompt (if external repos were cloned) ─────────────────
+SKILL_REPOS_PROMPT=""
+if [[ -d "${SKILL_REPOS_DIR}" ]] && ls -A "${SKILL_REPOS_DIR}" >/dev/null 2>&1; then
+  REPO_PATHS=""
+  for repo_dir in "${SKILL_REPOS_DIR}"/*/; do
+    [[ -d "${repo_dir}" ]] || continue
+    REPO_PATHS="${REPO_PATHS}  - ${repo_dir}"$'\n'
+  done
+  if [[ -n "${REPO_PATHS}" ]]; then
+    SKILL_REPOS_PROMPT="Before running tests, read the README of each skill repo below and install all the skills you find:
+${REPO_PATHS}
+"
+  fi
+fi
+
 # ── Run tests ────────────────────────────────────────────────────────────────
 ALL_PASS=true
 TESTED=""
@@ -156,6 +172,11 @@ while IFS= read -r feature || [[ -n "${feature}" ]]; do
   else
     echo "No profile found for '${slug}' — running with ${TEST_CMD}"
     PROMPT="${TEST_CMD} ${TARGET}"
+  fi
+
+  # Prepend skill-repos installation instructions if present
+  if [[ -n "${SKILL_REPOS_PROMPT}" ]]; then
+    PROMPT="${SKILL_REPOS_PROMPT}${PROMPT}"
   fi
 
   # Append extra instructions if provided

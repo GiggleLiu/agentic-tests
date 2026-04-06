@@ -74,11 +74,39 @@ The action installs the chosen runner, runs `/test-feature` (or `/test-skill`) f
 
 See `examples/agentic-test.yml` for a ready-to-copy workflow.
 
+## Development
+
+Run `make` to see available commands:
+
+- `make test` — Run all offline tests (no API keys needed)
+- `make test-integration` — Smoke-test installed runners with API keys
+- `make lint` — Lint shell scripts with shellcheck
+- `make check` — Lint + tests (use before committing)
+
+### Scripts
+
+Each step in `action.yml` delegates to a standalone script:
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/install-codex.sh` | Install Codex CLI binary |
+| `scripts/install-claude-code.sh` | Install Claude Code CLI |
+| `scripts/install-opencode.sh` | Install OpenCode CLI binary |
+| `scripts/configure-runner.sh` | Write runner-specific config (env: `INPUT_RUNNER`, `INPUT_MODEL`, `INPUT_PROVIDER`) |
+| `scripts/install-skills.sh` | Copy SKILL.md files to runner-specific paths (env: `INPUT_RUNNER`, `SKILLS_DIR`) |
+| `scripts/clone-skill-repos.sh` | Clone external skill repos to `.agentic-skills/` for agent-driven installation |
+| `scripts/run-tests.sh` | Execute agentic tests for each feature |
+| `scripts/post-result.sh` | Post test results as a GitHub issue/PR comment |
+| `scripts/test-scripts.sh` | Offline tests for configure-runner and install-skills |
+| `scripts/test-integration.sh` | Integration smoke-tests for installed runners |
+
 ## Key Files
 
 - `.claude-plugin/plugin.json` / `marketplace.json` — Plugin metadata for Claude Code marketplace
-- `action.yml` — GitHub Action metadata (composite action)
-- `scripts/` — CI helper scripts (install runners, run tests, post results)
+- `action.yml` — Main GitHub Action (composite action, delegates to scripts)
+- `setup-runner/action.yml` — Standalone sub-action for runner setup only (install, configure, skills)
+- `Makefile` — Development workflow commands
+- `scripts/` — CI helper scripts (install runners, configure, run tests, post results)
 - `examples/agentic-test.yml` — Example workflow for downstream repos
 - `docs/agent-profiles/` — Reusable agent profiles
 - `docs/plans/` — Design documents

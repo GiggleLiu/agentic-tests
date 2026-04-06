@@ -93,6 +93,8 @@ jobs:
           # runner: codex             # "opencode" (default), "codex", or "claude-code"
           # mode: feature             # "feature", "skill", or "both"
           # model: claude-sonnet-4-20250514
+          # skills: 'test-skill,test-feature,./my-skills/custom'  # built-in + custom skills
+          # skill-repos: 'owner/skill-repo'  # clone repos, let AI install skills
           # extra-prompt: 'focus on error handling and edge cases'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
