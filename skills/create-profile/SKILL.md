@@ -36,6 +36,8 @@ Determine whether the user wants to test a project feature or a skill:
 
 3. Record the chosen target type (`feature` or `skill`), the chosen target name, and a normalized target slug (lowercase, spaces replaced with hyphens) for later filename suggestions.
 
+4. **For `feature` targets only**, record a test mode. `test-feature` defaults to `blind` (the simulated user reads only the rendered docs and the result is gated on a real build/run); `standard` is the trusting flow that lets the user touch the repo directly. Accept the `blind` default unless the user asks for `standard`. Skip this for `skill` targets.
+
 ### Step 2 — Define Use Case
 
 1. Analyze the chosen feature's docs or skill's `SKILL.md` to understand what scenarios are possible.
@@ -77,6 +79,7 @@ Determine whether the user wants to test a project feature or a skill:
    ```
    Profile summary:
    - Target Type: [feature/skill]
+   - Mode: [blind/standard]   (feature targets only)
    - Target: [feature/skill name]
    - Use Case: [use case]
    - Expected Outcome: [expected outcome]
@@ -89,6 +92,9 @@ Determine whether the user wants to test a project feature or a skill:
 
    ## Target Type
    [feature/skill]
+
+   ## Mode
+   [blind/standard]
 
    ## Target
    [feature/skill name]
@@ -114,6 +120,9 @@ Determine whether the user wants to test a project feature or a skill:
 
    ## Target Type
    [feature|skill]
+
+   ## Mode
+   [blind|standard]   <!-- feature targets only; omit for skills -->
 
    ## Target
    [Feature or skill name]

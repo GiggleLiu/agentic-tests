@@ -15,7 +15,7 @@ Works with any software project type: libraries, CLI tools, web services, plugin
 
 ### Step 0 — Load Agent Profile
 
-**If the argument is a file path (contains `/` or ends in `.md`):** Read the profile file directly only if its canonical path resolves inside `docs/agent-profiles/`. Reject absolute paths, `..` traversal, home-directory references, and symlink escapes outside that directory. Require `## Target Type` to be `feature` when present. Extract Target (feature name), Use Case, Expected Outcome, and Agent fields. Skip the selection UI below and proceed to Step 1.
+**If the argument is a file path (contains `/` or ends in `.md`):** Read the profile file directly only if its canonical path resolves inside `docs/agent-profiles/`. Reject absolute paths, `..` traversal, home-directory references, and symlink escapes outside that directory. Require `## Target Type` to be `feature` when present. Extract Target (feature name), Use Case, Expected Outcome, Agent, and Mode fields. Skip the selection UI below and proceed to Step 1.
 
 **If the argument is a feature name (not a path):** Use it as the feature to test, skip Step 0, and proceed to Step 1 using the ephemeral flow.
 
@@ -34,8 +34,10 @@ If the user does not choose one of the listed saved profiles, continue without a
 
 If no saved profiles exist, skip this selection UI and continue immediately using the ephemeral flow.
 
-- **Load saved:** Read the profile file. Extract Target Type, Target (feature name), Use Case, Expected Outcome, and Agent fields. These carry forward into subsequent steps.
+- **Load saved:** Read the profile file. Extract Target Type, Target (feature name), Use Case, Expected Outcome, Agent, and Mode fields. These carry forward into subsequent steps.
 - **Ephemeral fallback:** Continue in this skill without saving first. After Step 1 resolves the feature scope, discuss the use case with the user, record the expected outcome, then derive a lightweight persona and continue.
+
+**Mode:** Profiles may set `## Mode` to `blind` (default) or `standard`. When the field is absent or no profile is loaded, the mode is **blind**. Blind mode hands the test subagent only the rendered docs and gates the result on a real build/run (Steps 1–3 below); standard mode is the trusting flow that lets the subagent use the repo directly.
 
 ### Step 1 — Discover Project & Features
 
@@ -48,6 +50,7 @@ If no saved profiles exist, skip this selection UI and continue immediately usin
    - User specified a feature argument but skipped Step 0: test only that feature
    - User specified nothing: list discovered features, then test all
 3. For each feature, collect the relevant doc sections — installation instructions, usage examples, API references, configuration guides.
+4. **Blind mode only — isolate the doc surface.** Pick the artifact a real new user would read (rendered docs site, `cargo doc`/Sphinx HTML, or README + getting-started), copy just those files into a fresh scratch directory, and exclude source code, manifest internals, git history, and issue links. Record exactly which doc files were included — gaps only count against this surface.
 
 Keep this discovery summary internal by default. Use it to determine the test scope, relevant docs, and setup plan. Do not present the full project/feature summary to the user unless it changes what can be tested.
 
@@ -134,13 +137,42 @@ Your task — act as a real user with the above persona:
    - **Doc suggestions:** What would you add or change in the docs?
 ```
 
+**Blind mode (default).** In blind mode, dispatch a *cheap / non-frontier* subagent and give it ONLY the isolated doc-surface directory from Step 1 — not the repo. A weaker doer is a feature: it papers over fewer gaps. Replace the task instructions above with:
+
+```
+You are [persona]. Using ONLY the documentation files in this directory, [use case].
+
+Hard constraint: read only files in this directory. Do not open the project
+source, browse the repo, use web search, or recall this library from memory. If
+something you need is not in these docs, that is a FINDING — never work around it.
+
+1. Explain the architecture and the intended usage path step by step, citing the
+   doc location for each claim, and list unknowns and documentation gaps.
+2. Write ONE minimal end-to-end program (plus its dependency manifest) for the
+   simplest workflow the docs advertise, using ONLY APIs the docs literally show.
+   At every point the docs do not supply what you need, insert an inline
+   `// GAP: <what is missing>` marker instead of guessing. Save the program and
+   manifest in this directory. Do NOT compile or run anything.
+```
+
+The doer's inferences are candidates, not ground truth; the orchestrator confirms them in Step 3.
+
 **Parallelism:** Independent features can be tested in parallel via multiple subagents. Note: in OpenCode, parallel `Task` calls may execute sequentially (known limitation). The skill works correctly either way — parallelism is a performance optimization, not a correctness requirement.
 
-### Step 3 — Report
+### Step 3 — Verification Gate (blind mode)
+
+Skip this step in standard mode. In blind mode, resolve the doer's program against the **real** project as an external downstream consumer:
+
+1. Create a throwaway downstream project OUTSIDE the workspace and add the project as a dependency the way the docs instruct (resolve any placeholder path/URL to the real local checkout or published package).
+2. Drop in the doer's program and run the project-type-appropriate gate: **library** → build (`cargo build`, `pip install . && python prog.py`, `tsc`, …); **CLI** → run the documented commands; **service** → start it and hit the documented endpoint. If the docs ship multiple runnable snippets, exercise each independently to localize a single rotten one. Record the command(s) and full output verbatim — pass/fail here is the headline verdict.
+3. A clean result is necessary but not sufficient. **Verify the doer's inferred API facts against real source** (treat every "I think X returns/takes/lives-in Y" as a candidate to confirm or correct), and re-grade the doer's severities — doers over-escalate cosmetic gaps and under-notice real breaks. The orchestrator's source-checked verdict goes in the report, not the doer's.
+4. **Turn doc-induced false positives into signposts.** For every inference you refuted or severity you downgraded, ask whether the docs led the doer there. If the docs are silent, ambiguous, or arranged so a careful reader reaches the wrong conclusion, that is an actionable finding even with no bug — plan a signpost (a clarifying sentence, type annotation, worked example, cross-link, or source comment). Only a candidate a clear doc would not have provoked is a pure reject.
+
+### Step 4 — Report
 
 Gather results from all subagents. Save report to `docs/test-reports/test-feature-<YYYYMMDD-HHMMSS>.md`:
 
-Set `**Verdict:** fail` whenever a blocking or high-severity issue prevents the expected outcome or materially breaks a tested user path. Set `**Critical Issues:**` to the integer count of such issues.
+Set `**Verdict:** fail` whenever a blocking or high-severity issue prevents the expected outcome or materially breaks a tested user path. In blind mode, a failed verification gate is an automatic fail. Set `**Critical Issues:**` to the integer count of such issues.
 
 ```markdown
 # Feature Test Report: [project name]
@@ -149,6 +181,7 @@ Set `**Verdict:** fail` whenever a blocking or high-severity issue prevents the 
 **Project type:** [library/CLI/web service/plugin/etc.]
 **Features tested:** [list]
 **Profile:** [profile name or "ephemeral"]
+**Mode:** [blind/standard]
 **Use Case:** [use case description]
 **Expected Outcome:** [expected outcome]
 **Verdict:** [pass/fail]
@@ -180,8 +213,11 @@ Set `**Verdict:** fail` whenever a blocking or high-severity issue prevents the 
 ## Issues Found
 [problems discovered, ordered by severity]
 
+## Blind-Mode Findings
+[Blind mode only. Include: the exact doc surface handed to the doer; the from-docs program + manifest with its `// GAP` markers; the verification-gate command(s) and verbatim output per snippet; and **misleading-doc findings** — for each refuted or downgraded candidate, what the doer wrongly inferred, the doc location that led there, and the proposed signpost. Note pure rejects (doer errors a clear doc would not have provoked) so the next run does not re-raise them.]
+
 ## Suggestions
-[actionable improvements ordered by impact]
+[actionable improvements ordered by impact; in blind mode prefer backing doc snippets with compile-checked example files so they cannot rot]
 ```
 
 Present the report path to the user and offer:
